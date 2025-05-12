@@ -20,11 +20,12 @@ defmodule IMFastTable do
   table = IMFastTable.new(:lease_manager, [{ :mac, :primary_key }, { :ip, :indexed }, { :amac, :indexed }, { :rip, :indexed }, { :exp, :indexed_non_uniq}, { :upd, :unindexed}])
   ```
 
+  **NOTE**: Order is important!!
+
   # To destroy an existing table
   ```elixir
   IMFastTable.destroy(:lease_manager)
   ```
-
 
   # To test of stress
   ```elixir
@@ -33,25 +34,34 @@ defmodule IMFastTable do
 
   # How are datas stored?
 
+  ## Calling new() stores this struct first
   ```
-  ## Calling new store the struct
   {:fields, [mac: :primary_key, ip: :indexed, amac: :indexed, rip: :indexed, exp: :indexed_non_uniq, upd: unindexed]}
+  ```
 
   ## When inserting...
   ```elixir
   IMFastTable.insert(:lease_manager, [187649973288960, 3187736577, 187649973288960, 168430081, 1746742811, 1746735611])
   ```
-  ```
-  # In table :lease_manager
-  {187649973288960, 3187736577, 187649973288960, 168430081, 1746742811, 1746735611}
 
-  # In table :lease_manager_ip_index
+  ### Store in table :lease_manager
+  ```
+  {187649973288960, 3187736577, 187649973288960, 168430081, 1746742811, 1746735611}
+  ```
+  ### Store in table :lease_manager_ip_index
+  ```
   { 3187736577, 187649973288960}
-  # In table :lease_manager_amac_index
+  ```
+  ### Store in table :lease_manager_amac_index
+  ```
   { 187649973288960, 187649973288960}
-  # In table :lease_manager_rip_index
+  ```
+  ### Store in table :lease_manager_rip_index
+  ```
   { 168430081, 187649973288960}
-  # In table :lease_manager_exp_index
+  ```
+  ### Store n table :lease_manager_exp_index
+  ```
   { 1746742811, 187649973288960}
   ```
 

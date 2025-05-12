@@ -1,7 +1,7 @@
 defmodule IMFastTable do
   @moduledoc """
 
-  Module to manage a in-memory table with primary_ley and secondary indexes.
+  Module to manage an in-memory table with primary_key and secondary indexes.
 
   # To create a table:
 

@@ -321,7 +321,11 @@ defmodule IMFastTable do
   def get_range(table, field_name, from, to, %{return: :keys} = opts) do
     table_index = get_table_index_name(:ets.info(table, :name), field_name)
     filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [:"$_"]}]
-    :ets.select(table_index, filter, Map.get(opts, :limit, :infinity))
+    case Map.get(opts, :limit, :infinity) do
+      :infinity -> :ets.select(table_index, filter)
+      limit when is_integer(limit) -> :ets.select(table_index, filter, limit)
+      _ -> :ets.select(table_index, filter)
+    end
   end
 
   def store(table, path) do

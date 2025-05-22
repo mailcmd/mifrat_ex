@@ -89,7 +89,7 @@ defmodule IMFastTable do
         end
         {:ok, ref} = :timer.apply_interval(period, fn ->
           [{_, _, path}] = :ets.lookup(table, :autosave)
-          IMFastTable.store(table_name, path)
+          store(table_name, path)
         end)
         :ets.insert(table, {:autosave, ref, String.to_charlist(path)})
         table
@@ -328,6 +328,34 @@ defmodule IMFastTable do
   end
   def load(path) do
     :ets.file2tab(path)
+  end
+
+  def reindex(table) do
+    fields = Keyword.get(:ets.lookup(table, :fields), :fields)
+    reindex_indexes(table, fields)
+    :ets.tab2list(table)
+      |> Enum.each(fn record ->
+        primary_key = elem(record, 0)
+        insert_indexes(
+          table,
+          :lists.enumerate(record),
+          fields,
+          primary_key
+        )
+      end)
+  end
+  defp reindex_indexes(_, []), do: :ok
+  defp reindex_indexes(table, [field | fields]) when not is_tuple(field),
+    do: reindex_indexes(table, fields)
+  defp reindex_indexes(table, [{_, index_type} | fields]) when index_type in [:unindexed, :primary_key],
+    do: reindex_indexes(table, fields)
+  defp reindex_indexes(table, [{field_name, index_type} | fields]) when index_type in [:indexed, :indexed_non_uniq] do
+    index_name = get_table_index_name(table, field_name)
+    try do
+      :ets.delete(index_name)
+    end
+    new_indexes(table, [{field_name, index_type}])
+    reindex_indexes(table, fields)
   end
 
   ################################################################################

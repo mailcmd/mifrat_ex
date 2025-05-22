@@ -252,14 +252,14 @@ defmodule IMFastTable do
   @spec delete_range(atom() | :ets.tid(), any(), any(), any()) :: list()
   def delete_range(table, field_name, from, to) do
     table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
-    filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [:"$_"]}]
-    :ets.match_delete(table_index, filter)
+    filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [true]}]
+    :ets.select_delete(table_index, filter)
   end
 
   @spec count_range(atom() | :ets.tid(), any(), any(), any()) :: list()
   def count_range(table, field_name, from, to) do
     table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
-    filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [:"$_"]}]
+    filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [true]}]
     :ets.select_count(table_index, filter)
   end
 

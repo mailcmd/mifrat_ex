@@ -329,24 +329,4 @@ defmodule IMFastTable do
       |> String.to_atom()
   end
 
-
-  ################################################################################
-  # TESTING TOOLS
-  ################################################################################
-  def stress_load(table) do
-    mac = 187649973288960
-    # Enum.reduce(3187736576..3187736586, table, fn (ip, table) ->
-    Enum.each(0x45450001..0x4545ffff, fn (ip) ->
-      IMFastTable.insert(table, [
-        mac + Enum.random(-1_000_000..1_000_000),
-        ip,
-        mac + Enum.random(-1_000_000..1_000_000),
-        ip + Enum.random(-100_000..100_000),
-        # System.system_time() + 7200000000000,
-        System.system_time(:second) + Enum.random(7200..24600),
-        System.system_time(:second)
-      ])
-    end)
-  end
-
 end

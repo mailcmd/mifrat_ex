@@ -312,6 +312,8 @@ defmodule IMFastTable do
 
   @spec get_range(atom() | :ets.tid(), any(), any(), any(), map()) :: list()
   def get_range(table, field_name, from, to, opts \\ %{return: :keys, limit: :infinity})
+  def get_range(table, field_name, from, to, [_|_] = opts), do:
+    get_range(table, field_name, from, to, Enum.into(opts, %{}))
   def get_range(table, field_name, from, to, %{return: :records} = opts) do
     get_range(table, field_name, from, to, %{opts|return: :keys})
       |> Enum.map(fn {_, primary_key} -> get(table, primary_key) end)

@@ -353,6 +353,8 @@ defmodule IMFastTable do
     index_name = get_table_index_name(table, field_name)
     try do
       :ets.delete(index_name)
+    rescue
+      _ -> :ok
     end
     new_indexes(table, [{field_name, index_type}])
     reindex_indexes(table, fields)

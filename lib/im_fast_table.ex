@@ -327,9 +327,12 @@ defmodule IMFastTable do
     :ets.tab2file(table, path)
   end
   def load(path) do
-    path
-      |> :ets.file2tab()
-      |> reindex()
+    case :ets.file2tab(path) do
+      {:error, _} = error -> error
+      {:ok, table} ->
+        reindex(table)
+        {:ok, table}
+    end
   end
 
   def reindex(table) do

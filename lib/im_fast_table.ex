@@ -310,17 +310,17 @@ defmodule IMFastTable do
          end)
   end
 
-  @spec get_range(atom() | :ets.tid(), any(), any(), any(), list()) :: list()
-  def get_range(table, field_name, from, to, opts \\ [return: :keys])
-  def get_range(table, field_name, from, to, return: :records) do
-    get_range(table, field_name, from, to, return: :keys)
+  @spec get_range(atom() | :ets.tid(), any(), any(), any(), map()) :: list()
+  def get_range(table, field_name, from, to, opts \\ %{return: :keys, limit: :infinity})
+  def get_range(table, field_name, from, to, %{return: :records} = opts) do
+    get_range(table, field_name, from, to, %{opts|return: :keys})
       |> Enum.map(fn {_, primary_key} -> get(table, primary_key) end)
 
   end
-  def get_range(table, field_name, from, to, return: :keys) do
+  def get_range(table, field_name, from, to, %{return: :keys, limit: limit}) do
     table_index = get_table_index_name(:ets.info(table, :name), field_name)
     filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [:"$_"]}]
-    :ets.select(table_index, filter)
+    :ets.select(table_index, filter, limit)
   end
 
   def store(table, path) do

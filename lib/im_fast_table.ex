@@ -191,7 +191,7 @@ defmodule IMFastTable do
         :skip
 
       {field_name, index_type} when index_type in [:indexed, :indexed_non_uniq] ->
-        index_table = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+        index_table = get_table_index_name(:ets.info(table, :name), field_name)
         :ets.insert(index_table, {data, primary_key})
     end
     [result | insert_indexes(table, datas, fields, primary_key) ]
@@ -222,11 +222,11 @@ defmodule IMFastTable do
         :skip
 
       {field_name, :indexed} ->
-        index_table = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+        index_table = get_table_index_name(:ets.info(table, :name), field_name)
         :ets.delete(index_table, data)
 
       {field_name, :indexed_non_uniq} ->
-        index_table = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+        index_table = get_table_index_name(:ets.info(table, :name), field_name)
         :ets.delete_object(index_table, {data, primary_key})
     end
 
@@ -235,7 +235,7 @@ defmodule IMFastTable do
 
   @spec delete(atom() | :ets.tid(), any(), any()) :: :ok
   def delete(table, field_name, key) do
-    table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
     :ets.lookup(table_index, key)
       |> Enum.each(fn {_, primary_key} ->
            delete(table, primary_key)
@@ -251,14 +251,14 @@ defmodule IMFastTable do
 
   @spec delete_range(atom() | :ets.tid(), any(), any(), any()) :: list()
   def delete_range(table, field_name, from, to) do
-    table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
     filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [true]}]
     :ets.select_delete(table_index, filter)
   end
 
   @spec count_range(atom() | :ets.tid(), any(), any(), any()) :: list()
   def count_range(table, field_name, from, to) do
-    table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
     filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [true]}]
     :ets.select_count(table_index, filter)
   end
@@ -274,7 +274,7 @@ defmodule IMFastTable do
 
   @spec get(atom() | :ets.tid(), any(), any()) :: list()
   def get(table, field_name, key) do
-    table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
     :ets.lookup(table_index, key)
       |> Enum.map(fn {_, primary_key} ->
            get(table, primary_key)
@@ -303,7 +303,7 @@ defmodule IMFastTable do
 
   @spec get_map(atom() | :ets.tid(), any(), any()) :: [map()]
   def get_map(table, field_name, key) do
-    table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
     :ets.lookup(table_index, key)
       |> Enum.map(fn {_, primary_key} ->
            get_map(table, primary_key)
@@ -318,7 +318,7 @@ defmodule IMFastTable do
 
   end
   def get_range(table, field_name, from, to, return: :keys) do
-    table_index = get_table_index_name(Keyword.get(:ets.info(table), :name), field_name)
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
     filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [:"$_"]}]
     :ets.select(table_index, filter)
   end
@@ -329,10 +329,11 @@ defmodule IMFastTable do
   def load(path) do
     path
       |> :ets.file2tab()
-      # |> reindex()
+      |> reindex()
   end
 
   def reindex(table) do
+    table = :ets.info(table, :name)
     fields = Keyword.get(:ets.lookup(table, :fields), :fields)
     reindex_indexes(table, fields)
     :ets.tab2list(table)

@@ -338,7 +338,7 @@ defmodule IMFastTable do
         primary_key = elem(record, 0)
         insert_indexes(
           table,
-          :lists.enumerate(record),
+          record |> Tuple.to_list() |> :lists.enumerate(),
           fields,
           primary_key
         )

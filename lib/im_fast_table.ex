@@ -324,10 +324,10 @@ defmodule IMFastTable do
   end
 
   def store(table, path) do
-    :ets.tab2file(table, path)
+    :ets.tab2file(table, path |> to_charlist())
   end
   def load(path) do
-    case :ets.file2tab(path) do
+    case path |> to_charlist() |> :ets.file2tab() do
       {:error, _} = error -> error
       {:ok, table} ->
         reindex(table)

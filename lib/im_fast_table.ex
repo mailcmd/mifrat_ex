@@ -323,7 +323,7 @@ defmodule IMFastTable do
     filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [:"$_"]}]
     case Map.get(opts, :limit, :infinity) do
       :infinity -> :ets.select(table_index, filter)
-      limit when is_integer(limit) -> :ets.select(table_index, filter, limit)
+      limit when is_integer(limit) -> :ets.select(table_index, filter, limit) |> elem(0)
       _ -> :ets.select(table_index, filter)
     end
   end

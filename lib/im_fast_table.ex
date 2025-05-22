@@ -327,7 +327,9 @@ defmodule IMFastTable do
     :ets.tab2file(table, path)
   end
   def load(path) do
-    :ets.file2tab(path)
+    path
+      |> :ets.file2tab()
+      |> reindex()
   end
 
   def reindex(table) do

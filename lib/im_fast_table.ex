@@ -66,12 +66,43 @@ defmodule IMFastTable do
   ```
 
   """
+  ################################################################################
+  # Macros
+  ################################################################################
+
+  defmacro filter_string(pattern, guard \\ "true", return \\ "full_record") do
+    quote do
+      f =
+        Code.eval_string("""
+        fn #{unquote(pattern)} #{unquote(return) == "full_record" && " = full_record" || ""} when #{unquote(guard)} ->
+          #{unquote(return)}
+        end
+        """) |> elem(0)
+      :ets.fun2ms(f)
+    end
+  end
+
+  defmacro filter(pattern, guard \\ true, return \\ quote do: full_record) do
+    quote do
+      f =
+        fn unquote(pattern) = full_record when unquote(guard) ->
+          unquote(return)
+        end
+      :ets.fun2ms(f)
+    end
+  end
+
+  ################################################################################
+  # API
+  ################################################################################
 
   @spec new(atom(), keyword(), keyword()) :: atom() | :ets.tid()
   def new(table_name, fields, options \\ []) do
     autosave = Keyword.get(options, :autosave, false)
     path = Keyword.get(options, :path, nil)
     period = Keyword.get(options, :period, 300_000)
+
+    fields = fields ++ [{:_internal, :indexed_non_uniq}]
 
     cond do
       autosave and not is_binary(path) ->
@@ -141,10 +172,6 @@ defmodule IMFastTable do
     :ets.delete(index_name)
     destroy_indexes(table, fields)
   end
-
-
-  # IMFastTable.insert(table, [187649973288960, 3187736577, 187649973288960, 168430081, 1746742811, 1746735611])
-  # IMFastTable.insert(table, {187649973288960, 3187736577, 187649973288960, 168430081, 1746742811, 1746735611})
 
   @spec insert(atom() | :ets.tid(), [...] | tuple()) :: :duplicate_record | [:skip | true | false]
   def insert(table, record) when is_tuple(record), do: insert(table, Tuple.to_list(record))
@@ -370,6 +397,41 @@ defmodule IMFastTable do
     new_indexes(table, [{field_name, index_type}])
     reindex_indexes(table, fields)
   end
+
+  def custom_filter(table, guard \\ "true", return \\ "full_record") do
+    fields = Keyword.get(:ets.lookup(table, :fields), :fields)
+    guard = " #{guard} "
+    pattern = "{"
+      |> Kernel.<>(
+        fields
+          |> Enum.map(fn {field_name, _} ->
+                str = to_string(field_name)
+               if String.match?(guard, ~r"[^a-z0-9_]{1}#{str}[^a-z0-9_]{1}") do
+                 str
+               else
+                 "_"
+               end
+             end)
+          |> Enum.join(", ")
+         )
+      |> Kernel.<>("}")
+
+    filter_string(pattern, guard, return)
+  end
+
+  def custom_search(table, guard \\ "true", return \\ "full_record") do
+    :ets.select(table, custom_filter(guard, return))
+  end
+
+  def custom_delete(table, guard \\ "true") do
+    :ets.select_delete(table, custom_filter(guard, []))
+  end
+
+  def custom_update(table, guard \\ "true") do
+    :ets.select_delete(table, custom_filter(guard, []))
+  end
+
+
 
   ################################################################################
   # Small helpers

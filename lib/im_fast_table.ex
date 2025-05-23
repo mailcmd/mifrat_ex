@@ -483,6 +483,7 @@ defmodule IMFastTable do
   # custom_count
   ################################################################################
   @spec custom_count(:ets.tid(), :full | String.t(), String.t()) :: integer()
+  def custom_count(table, pattern \\ :full, guard \\ "true")
   def custom_count(table, :full, guard) do
     custom_count(table, build_pattern(table), guard)
   end

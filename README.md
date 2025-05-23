@@ -61,8 +61,10 @@ IMFastTable.insert(:lease_manager, [187649973288960, 3187736577, 187649973288960
 ```
 ### Store n table :lease_manager_exp_index
 ```
-{ 1746742811, 187649973288960}
+{ 1746742811, [187649973288960]}
 ```
+
+## When 
 
 ## Installation
 

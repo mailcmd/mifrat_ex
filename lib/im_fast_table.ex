@@ -66,6 +66,7 @@ defmodule IMFastTable do
   ```
 
   """
+  # require IMFastTable
   ################################################################################
   # Macros
   ################################################################################
@@ -96,6 +97,10 @@ defmodule IMFastTable do
   # API
   ################################################################################
 
+
+  ################################################################################
+  # destroy
+  ################################################################################
   @spec destroy(atom() | :ets.tid()) :: true
   def destroy(table) do
     fields = Keyword.get(:ets.lookup(table, :fields), :fields)
@@ -120,6 +125,9 @@ defmodule IMFastTable do
     destroy_indexes(table, fields)
   end
 
+  ################################################################################
+  # new
+  ################################################################################
   @spec new(atom(), keyword(), keyword()) :: atom() | :ets.tid()
   def new(table_name, fields, options \\ []) do
     autosave = Keyword.get(options, :autosave, false)
@@ -174,6 +182,9 @@ defmodule IMFastTable do
     new_indexes(table_name, fields)
   end
 
+  ################################################################################
+  # insert
+  ################################################################################
   @spec insert(atom() | :ets.tid(), [...] | tuple()) :: :duplicate_record | [:skip | true | false]
   def insert(table, record) when is_tuple(record), do: insert(table, Tuple.to_list(record))
   def insert(table, record) do
@@ -200,7 +211,7 @@ defmodule IMFastTable do
 
       [cur_rec] ->
         :ets.insert(table, List.to_tuple(record))
-        delete_indexes(
+        remove_indexes(
           table,
           cur_rec |> Tuple.to_list() |> :lists.enumerate(),
           fields,
@@ -226,8 +237,11 @@ defmodule IMFastTable do
     [result | insert_indexes(table, datas, fields, primary_key) ]
   end
 
-  @spec delete(atom() | :ets.tid(), any()) :: :not_found | [:skip | true | false ]
-  def delete(table, primary_key) do
+  ################################################################################
+  # remove
+  ################################################################################
+  @spec remove(atom() | :ets.tid(), any()) :: :not_found | [:skip | true | false ]
+  def remove(table, primary_key) do
     record = :ets.lookup(table, primary_key)
     if record == [] do
       :not_found
@@ -236,7 +250,7 @@ defmodule IMFastTable do
         |> hd()
         |> Tuple.to_list()
       fields = Keyword.get(:ets.lookup(table, :fields), :fields)
-      delete_indexes(
+      remove_indexes(
         table,
         :lists.enumerate(record),
         fields,
@@ -244,8 +258,8 @@ defmodule IMFastTable do
       ) ++ [:ets.delete(table, primary_key)]
     end
   end
-  defp delete_indexes(_, [], _, _), do: []
-  defp delete_indexes(table, [ {idx, data} | datas ], fields, primary_key) do
+  defp remove_indexes(_, [], _, _), do: []
+  defp remove_indexes(table, [ {idx, data} | datas ], fields, primary_key) do
     result = case :lists.nth(idx, fields) do
       {_, index_type} when index_type in [:primary_key, :unindexed] ->
         :skip
@@ -259,23 +273,47 @@ defmodule IMFastTable do
         :ets.delete_object(index_table, {data, primary_key})
     end
 
-    [result | delete_indexes(table, datas, fields, primary_key) ]
+    [result | remove_indexes(table, datas, fields, primary_key) ]
+  end
+
+  @spec remove(atom() | :ets.tid(), any(), any()) :: :ok
+  def remove(table, field_name, key) do
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
+    :ets.lookup(table_index, key)
+      |> Enum.each(fn {_, primary_key} ->
+           remove(table, primary_key)
+         end)
+  end
+
+
+  ################################################################################
+  # delete
+  ################################################################################
+  @spec delete(atom() | :ets.tid(), any()) :: :not_found | [:skip | true | false ]
+  def delete(table, primary_key) do
+    pattern = table
+      |> build_pattern()
+      |> String.replace("sys_flag", "_sys_flag")
+    return = String.replace(pattern, "_sys_flag", ":deleted")
+    :ets.select_replace(table, filter_string(pattern, "mac == #{primary_key}", return))
   end
 
   @spec delete(atom() | :ets.tid(), any(), any()) :: :ok
   def delete(table, field_name, key) do
-    table_index = get_table_index_name(:ets.info(table, :name), field_name)
-    :ets.lookup(table_index, key)
-      |> Enum.each(fn {_, primary_key} ->
-           delete(table, primary_key)
+    get(table, field_name, key, return: :keys)
+      |> Enum.each(fn {_, pk} ->
+           delete(table, pk)
          end)
   end
 
-  @spec delete_many(any(), list()) :: :ok
-  def delete_many(_table, []), do: :ok
-  def delete_many(table, [primary_key | primary_keys]) do
+  ################################################################################
+  # delete_list
+  ################################################################################
+  @spec delete_list(any(), list()) :: :ok
+  def delete_list(_table, []), do: :ok
+  def delete_list(table, [primary_key | primary_keys]) do
     delete(table, primary_key)
-    delete_many(table, primary_keys)
+    delete_list(table, primary_keys)
   end
 
   @spec delete_range(atom() | :ets.tid(), any(), any(), any()) :: list()
@@ -285,6 +323,9 @@ defmodule IMFastTable do
     :ets.select_delete(table_index, filter)
   end
 
+  ################################################################################
+  # count_range
+  ################################################################################
   @spec count_range(atom() | :ets.tid(), any(), any(), any()) :: list()
   def count_range(table, field_name, from, to) do
     table_index = get_table_index_name(:ets.info(table, :name), field_name)
@@ -292,7 +333,9 @@ defmodule IMFastTable do
     :ets.select_count(table_index, filter)
   end
 
-
+  ################################################################################
+  # get/2
+  ################################################################################
   @spec get(atom() | :ets.tid(), any()) :: :not_found | tuple()
   def get(table, primary_key) do
     case :ets.lookup(table, primary_key) do
@@ -301,11 +344,14 @@ defmodule IMFastTable do
     end
   end
 
+  ################################################################################
+  # get/3
+  ################################################################################
   @spec get(atom() | :ets.tid(), any(), any(), map() | list()) :: list()
-  def get(table, field_name, key, opts \\ %{return: :record})
+  def get(table, field_name, key, opts \\ %{return: :records})
   def get(table, field_name, key, [_|_] = opts), do:
     get(table, field_name, key, Enum.into(opts, %{}))
-  def get(table, field_name, key, %{return: :record}) do
+  def get(table, field_name, key, %{return: :records}) do
     get(table, field_name, key, %{return: :keys})
       |> Enum.map(fn {_, primary_key} ->
            get(table, primary_key)
@@ -316,6 +362,9 @@ defmodule IMFastTable do
     :ets.lookup(table_index, key)
   end
 
+  ################################################################################
+  # get_map/2
+  ################################################################################
   @spec get_map(atom() | :ets.tid(), any()) :: :not_found | map()
   def get_map(table, primary_key) do
     fields = Keyword.get(:ets.lookup(table, :fields), :fields)
@@ -336,6 +385,9 @@ defmodule IMFastTable do
 
   end
 
+  ################################################################################
+  # get_map/3
+  ################################################################################
   @spec get_map(atom() | :ets.tid(), any(), any()) :: [map()]
   def get_map(table, field_name, key) do
     table_index = get_table_index_name(:ets.info(table, :name), field_name)
@@ -345,6 +397,9 @@ defmodule IMFastTable do
          end)
   end
 
+  ################################################################################
+  # get_range
+  ################################################################################
   @spec get_range(atom() | :ets.tid(), any(), any(), any(), map()) :: list()
   def get_range(table, field_name, from, to, opts \\ %{return: :keys, limit: :infinity})
   def get_range(table, field_name, from, to, [_|_] = opts), do:
@@ -363,9 +418,16 @@ defmodule IMFastTable do
     end
   end
 
+  ################################################################################
+  # store
+  ################################################################################
   def store(table, path) do
     :ets.tab2file(table, path |> to_charlist())
   end
+
+  ################################################################################
+  # load
+  ################################################################################
   def load(path) do
     case path |> to_charlist() |> :ets.file2tab() do
       {:error, _} = error -> error
@@ -375,6 +437,9 @@ defmodule IMFastTable do
     end
   end
 
+  ################################################################################
+  # reindex
+  ################################################################################
   def reindex(table) do
     table = :ets.info(table, :name)
     fields = Keyword.get(:ets.lookup(table, :fields), :fields)
@@ -406,10 +471,60 @@ defmodule IMFastTable do
     reindex_indexes(table, fields)
   end
 
+  ################################################################################
+  # custom_filter
+  ################################################################################
   def custom_filter(table, guard \\ "true", return \\ "full_record") do
+    pattern = build_pattern(table, guard)
+    filter_string(pattern, guard, return)
+  end
+
+  ################################################################################
+  # custom_search
+  ################################################################################
+  def custom_search(table, pattern \\ :full, guard \\ "true", return \\ "full_record")
+  def custom_search(table, :full, guard, return) do
+    pattern = build_pattern(table)
+    custom_search(table, pattern, guard, return)
+  end
+  def custom_search(table, pattern, guard, return) do
+    :ets.select(table, filter_string(pattern, guard, return))
+  end
+
+  ################################################################################
+  # custom_delete
+  ################################################################################
+  @spec custom_delete(:ets.tid(), :full | String.t(), String.t()) :: integer()
+  def custom_delete(table, :full, guard) do
+    custom_delete(table, build_pattern(table), guard)
+  end
+  def custom_delete(table, pattern, guard) do
+    pattern = String.replace(pattern, "sys_flag", "_sys_flag")
+    return = String.replace(pattern, "_sys_flag", ":deleted")
+    :ets.select_replace(table, filter_string(pattern, guard, return))
+  end
+
+  ################################################################################
+  # custom_update
+  ################################################################################
+  def custom_update(table, guard \\ "true") do
+    :ets.select_delete(table, custom_filter(guard, []))
+  end
+
+
+  ################################################################################
+  # Small helpers
+  ################################################################################
+  defp build_pattern(table, guard \\ nil) do
     fields = Keyword.get(:ets.lookup(table, :fields), :fields)
-    guard = " #{guard} "
-    pattern = "{"
+    guard =
+      if guard != nil do
+        " #{guard} "
+      else
+        " #{fields |> Enum.map(fn {n,_} -> to_string(n) end) |> Enum.join(" ")} "
+      end
+
+    "{"
       |> Kernel.<>(
         fields
           |> Enum.map(fn {field_name, _} ->
@@ -423,27 +538,8 @@ defmodule IMFastTable do
           |> Enum.join(", ")
          )
       |> Kernel.<>("}")
-
-    filter_string(pattern, guard, return)
   end
 
-  def custom_search(table, guard \\ "true", return \\ "full_record") do
-    :ets.select(table, custom_filter(guard, return))
-  end
-
-  def custom_delete(table, guard \\ "true") do
-    :ets.select_delete(table, custom_filter(guard, []))
-  end
-
-  def custom_update(table, guard \\ "true") do
-    :ets.select_delete(table, custom_filter(guard, []))
-  end
-
-
-
-  ################################################################################
-  # Small helpers
-  ################################################################################
   defp find_primary_key_idx(keyword_list) do
     Enum.find_index(keyword_list, fn {_,t} -> t == :primary_key end) + 1
   end

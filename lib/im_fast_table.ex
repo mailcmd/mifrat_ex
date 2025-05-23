@@ -176,6 +176,7 @@ defmodule IMFastTable do
   @spec insert(atom() | :ets.tid(), [...] | tuple()) :: :duplicate_record | [:skip | true | false]
   def insert(table, record) when is_tuple(record), do: insert(table, Tuple.to_list(record))
   def insert(table, record) do
+    record = record ++ [:ok]
     fields = Keyword.get(:ets.lookup(table, :fields), :fields)
     primary_key_idx = find_primary_key_idx(fields)
     primary_key = :lists.nth(primary_key_idx, record)

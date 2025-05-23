@@ -480,6 +480,17 @@ defmodule IMFastTable do
   end
 
   ################################################################################
+  # custom_count
+  ################################################################################
+  @spec custom_count(:ets.tid(), :full | String.t(), String.t()) :: integer()
+  def custom_count(table, :full, guard) do
+    custom_count(table, build_pattern(table), guard)
+  end
+  def custom_count(table, pattern, guard) do
+    :ets.select_count(table, filter_string(pattern, guard, return))
+  end
+
+  ################################################################################
   # custom_search
   ################################################################################
   def custom_search(table, pattern \\ :full, guard \\ "true", return \\ "full_record")
@@ -507,9 +518,9 @@ defmodule IMFastTable do
   ################################################################################
   # custom_update
   ################################################################################
-  def custom_update(table, guard \\ "true") do
-    :ets.select_delete(table, custom_filter(guard, []))
-  end
+  # def custom_update(table, guard \\ "true") do
+  #   :ets.select_delete(table, custom_filter(guard, []))
+  # end
 
 
   ################################################################################

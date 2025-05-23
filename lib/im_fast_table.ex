@@ -487,7 +487,7 @@ defmodule IMFastTable do
     custom_count(table, build_pattern(table), guard)
   end
   def custom_count(table, pattern, guard) do
-    :ets.select_count(table, filter_string(pattern, guard, return))
+    :ets.select_count(table, filter_string(pattern, guard, "[true]"))
   end
 
   ################################################################################

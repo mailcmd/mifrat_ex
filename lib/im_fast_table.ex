@@ -102,7 +102,7 @@ defmodule IMFastTable do
     path = Keyword.get(options, :path, nil)
     period = Keyword.get(options, :period, 300_000)
 
-    fields = fields ++ [{:_internal, :indexed_non_uniq}]
+    fields = fields ++ [{:sys_flag, :indexed_non_uniq}]
 
     cond do
       autosave and not is_binary(path) ->

@@ -96,6 +96,30 @@ defmodule IMFastTable do
   # API
   ################################################################################
 
+  @spec destroy(atom() | :ets.tid()) :: true
+  def destroy(table) do
+    fields = Keyword.get(:ets.lookup(table, :fields), :fields)
+    case :ets.lookup(table, :autosave) do
+      [] -> :ok
+      [{:autosave, ref, path}] ->
+        :timer.cancel(ref)
+        store(table, path)
+    end
+    destroy_indexes(table, fields)
+    :ets.delete(table)
+  end
+
+  defp destroy_indexes(_, []), do: :ok
+  defp destroy_indexes(table, [field | fields]) when not is_tuple(field),
+    do: destroy_indexes(table, fields)
+  defp destroy_indexes(table, [{_, index_type} | fields]) when index_type in [:unindexed, :primary_key],
+    do: destroy_indexes(table, fields)
+  defp destroy_indexes(table, [{field_name, index_type} | fields]) when index_type in [:indexed, :indexed_non_uniq] do
+    index_name = get_table_index_name(table, field_name)
+    :ets.delete(index_name)
+    destroy_indexes(table, fields)
+  end
+
   @spec new(atom(), keyword(), keyword()) :: atom() | :ets.tid()
   def new(table_name, fields, options \\ []) do
     autosave = Keyword.get(options, :autosave, false)
@@ -148,29 +172,6 @@ defmodule IMFastTable do
     index_name = get_table_index_name(table_name, field_name)
     :ets.new(index_name, [:ordered_set, :public, :named_table, read_concurrency: true, write_concurrency: true])
     new_indexes(table_name, fields)
-  end
-
-  @spec destroy(atom() | :ets.tid()) :: true
-  def destroy(table) do
-    fields = Keyword.get(:ets.lookup(table, :fields), :fields)
-    case :ets.lookup(table, :autosave) do
-      [] -> :ok
-      [{:autosave, ref, path}] ->
-        :timer.cancel(ref)
-        store(table, path)
-    end
-    destroy_indexes(table, fields)
-    :ets.delete(table)
-  end
-  defp destroy_indexes(_, []), do: :ok
-  defp destroy_indexes(table, [field | fields]) when not is_tuple(field),
-    do: destroy_indexes(table, fields)
-  defp destroy_indexes(table, [{_, index_type} | fields]) when index_type in [:unindexed, :primary_key],
-    do: destroy_indexes(table, fields)
-  defp destroy_indexes(table, [{field_name, index_type} | fields]) when index_type in [:indexed, :indexed_non_uniq] do
-    index_name = get_table_index_name(table, field_name)
-    :ets.delete(index_name)
-    destroy_indexes(table, fields)
   end
 
   @spec insert(atom() | :ets.tid(), [...] | tuple()) :: :duplicate_record | [:skip | true | false]
@@ -300,13 +301,19 @@ defmodule IMFastTable do
     end
   end
 
-  @spec get(atom() | :ets.tid(), any(), any()) :: list()
-  def get(table, field_name, key) do
-    table_index = get_table_index_name(:ets.info(table, :name), field_name)
-    :ets.lookup(table_index, key)
+  @spec get(atom() | :ets.tid(), any(), any(), map() | list()) :: list()
+  def get(table, field_name, key, opts \\ %{return: :record})
+  def get(table, field_name, key, [_|_] = opts), do:
+    get(table, field_name, key, Enum.into(opts, %{}))
+  def get(table, field_name, key, %{return: :record}) do
+    get(table, field_name, key, %{return: :keys})
       |> Enum.map(fn {_, primary_key} ->
            get(table, primary_key)
          end)
+  end
+  def get(table, field_name, key, %{return: :keys}) do
+    table_index = get_table_index_name(:ets.info(table, :name), field_name)
+    :ets.lookup(table_index, key)
   end
 
   @spec get_map(atom() | :ets.tid(), any()) :: :not_found | map()

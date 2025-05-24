@@ -87,6 +87,7 @@ Si agregáramos otros registros:
 |{2915031105, 1}|
 |{2915010203, 2}|
 
+Y agregamos otro:
 
 ``` 
 {3, "Pablo Marmol", 1972, 2915040506}
@@ -121,6 +122,7 @@ por
 Al hacer el update ocurre lo siguiente:
 
 1. Primero se actualizan los índices:
+   
 |users_year_of_birdh_index|
 |-----|
 |{1972, [**2**, 3, 1]}|
@@ -132,6 +134,7 @@ Al hacer el update ocurre lo siguiente:
 |{2915040506, 3}|
 
 2. Luego se actualiza el registro principal:
+
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
@@ -150,10 +153,8 @@ principal luciría de este modo:
 |~~{3, "Pablo Marmol", 1972, 2915040506}~~|
 
 ## Borrado físico
-El borrado físico elimina el registro principal y sus referencias en los índices:
-
-Si queremos borrar lógicamente el registro con PK = 3 los índices quedarían igual y las tablas
-quedarían de este modo:
+El borrado físico elimina el registro principal y sus referencias en los índices. Si queremos borrar 
+lógicamente el registro con PK = 3 las tablas quedarían de este modo:
 
 |users|
 |-----|

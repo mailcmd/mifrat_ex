@@ -1,6 +1,6 @@
 # In Memory Fast Table
 
-## Funcionamiento
+## About the storage structure
 
 The table is created by detailing the fields. The name of the field, the type of field (if it is PK, 
 IDX or IDX_NOT_UNIQ) and the order in which they are declared are important. 

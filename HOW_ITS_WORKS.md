@@ -143,7 +143,7 @@ The following happens when updating:
 |{2, "Juan de las Pelotas", 1972, 2915012233}|
 |{3, "Pablo Marmol", 1972, 2915040506}|
 
-## Borrado lógico
+## Logical deletion
 Logical deletion does not make the information disappear but marks it for later deletion 
 . If we want to logically delete the record with PK = 3, the indexes would remain the same and the main table
 would look like this:
@@ -154,7 +154,7 @@ would look like this:
 |{2, "Juan de las Pelotas", 1972, 2915012233}|
 |~~{3, "Pablo Marmol", 1972, 2915040506}~~|
 
-## Borrado físico
+## Physical deletion
 The physical deletion removes the main record and its references in the indexes. If we want to fiscally delete 
 the record with PK = 3, the tables would look like this:
 

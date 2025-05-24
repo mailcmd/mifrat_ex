@@ -1,24 +1,26 @@
 # In Memory Fast Table
 
 ## Funcionamiento
-La tabla se crea detallando los campos. Importa el nombre del campo, el tipo de campo (si es PK, 
-IDX o IDX_NOT_UNIQ) y el orden en que se los declara. 
-A partir de allí se crean unos registros internos de la tabla que detallan la estructura y 
-mantienen ciertos metadatos que permiten manejar la tabla. 
-Por cada índice extra de la tabla (no para la PK) se crea una tabla auxiliar. Para los índices 
-sin repetición se crea una tabla con la estructura de registro:
+
+The table is created by detailing the fields. The name of the field, the type of field (if it is PK, 
+IDX or IDX_NOT_UNIQ) and the order in which they are declared are important. 
+From there, internal table records are created that detail the structure and 
+holds certain metadata that allows the table to be managed. 
+For each extra index of the table (not for the PK) an auxiliary table is created. For the indexes 
+without repetition a table with this record structure is created:
+
 ```
 {idx_value, primary_key}
 ```
 
-Para los índices con repetición se crea una tabla con la estructura de registro:
+For indexes with repetition, a table with this record structure is created:
 ```
 {idx_value, [primary_key1, primary_ke2, ...]}
 ```
 
-## Insersión
-Supongamos que la estructura de la tabla es: 
-```
+## Insertion
+Suppose the structure of the table is:
+```elixir
 [
     {:id, :primary_key},
     {:name, :unindexed},
@@ -27,34 +29,34 @@ Supongamos que la estructura de la tabla es:
 ]
 ```
 
-y la tabla se llama *:users*. 
+and the table is called *:users*. 
 
-En una insersión se podría agregar un registro como:
-```
-{
+In an insertion you could add a record such as:
+```elixir
+%{
     id: 1,
     name: "Carlos Poncho",
     year_of_birth: 1972,
     phone: 2915031105
 }
 ```
-Esto provoca las siguiente acciones:
+This causes the following actions:
 
-1. Se crea/agrega el índice de *:year_of_birth* a la tabla auxiliar correspondiente 
+1. The index entry of *:year_of_birth* is created/added to the corresponding auxiliary table 
 (*:users_year_of_birdh_index*):
 ```
 {1972, [1]}
 ```
-2. Se crea/agrega el índice de *:phone* a la tabla auxiliar correspondiente (*:users_phone_index*):
+2. The index entry of *:phone* is created/added to the corresponding auxiliary table (*:users_phone_index*):
 ```
 {2915031105, 1}
 ```
-3. Se agrega el registro completo en la tabla principal (*:users*):
+3. The complete record is added to the main table (*:users*):
 ```
 {1, "Carlos Poncho", 1972, 2915031105}
 ``` 
 
-En este momento tendríamos las tablas con la siguiente información:
+At this point we would have the tables with the following information:
 
 |users|
 |-----|
@@ -68,7 +70,7 @@ En este momento tendríamos las tablas con la siguiente información:
 |-----|
 |{2915031105, 1}|
 
-Si agregáramos otros registros:
+If we were to add other records:
 ``` 
 {2, "Juan de las Pelotas", 1976, 2915010203}
 ``` 
@@ -87,7 +89,7 @@ Si agregáramos otros registros:
 |{2915031105, 1}|
 |{2915010203, 2}|
 
-Y agregamos otro:
+And we added another one:
 
 ``` 
 {3, "Pablo Marmol", 1972, 2915040506}
@@ -109,19 +111,19 @@ Y agregamos otro:
 |{2915010203, 2}|
 |{2915040506, 3}|
 
-## Actualización
-Ahora vamos a suponer que queremos modificar el registro: 
+## Update
+Now let's assume that we want to modify the registry:
 ```
 {2, "Juan de las Pelotas", 1976, 2915010203}
 ```
-por
+by
 ```
 {2, "Juan de las Pelotas", 1972, 2915012233}
 ```
 
-Al hacer el update ocurre lo siguiente:
+The following happens when updating:
 
-1. Primero se actualizan los índices:
+1. First the indexes are updated:
    
 |users_year_of_birdh_index|
 |-----|
@@ -133,7 +135,7 @@ Al hacer el update ocurre lo siguiente:
 |{**2915012233**, 2}|
 |{2915040506, 3}|
 
-2. Luego se actualiza el registro principal:
+2. The main register is then updated:
 
 |users|
 |-----|
@@ -142,9 +144,9 @@ Al hacer el update ocurre lo siguiente:
 |{3, "Pablo Marmol", 1972, 2915040506}|
 
 ## Borrado lógico
-El borrado lógico no hace desaparecer la información sino que la marca para su posterior 
-eliminación. Si queremos borrar lógicamente el registro con PK = 3 los índices quedarían igual y la tabla
-principal luciría de este modo:
+Logical deletion does not make the information disappear but marks it for later deletion 
+. If we want to logically delete the record with PK = 3, the indexes would remain the same and the main table
+would look like this:
 
 |users|
 |-----|
@@ -153,8 +155,8 @@ principal luciría de este modo:
 |~~{3, "Pablo Marmol", 1972, 2915040506}~~|
 
 ## Borrado físico
-El borrado físico elimina el registro principal y sus referencias en los índices. Si queremos borrar 
-lógicamente el registro con PK = 3 las tablas quedarían de este modo:
+The physical deletion removes the main record and its references in the indexes. If we want to fiscally delete 
+the record with PK = 3, the tables would look like this:
 
 |users|
 |-----|

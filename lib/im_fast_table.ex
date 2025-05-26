@@ -12,7 +12,8 @@ defmodule IMFastTable do
     quote do
       f =
         Code.eval_string("""
-        fn #{unquote(pattern)} #{unquote(return) == "full_record" && " = full_record" || ""} when #{unquote(guard)} ->
+        fn #{unquote(pattern)} #{unquote(return) == "full_record" && " = full_record" || ""}
+           #{unquote(guard) in ["", "true"] && "" || " when #{unquote(guard)}"} ->
           #{unquote(return)}
         end
         """) |> elem(0)
@@ -72,7 +73,9 @@ defmodule IMFastTable do
     id: :primary_key
     name: :unindexed,
     year: :indexed_non_uniq,
-    phone: indexed
+    phone: :indexed
+  ], [
+    gc_period: 3_600_000 # 1 hour
   ])
   ```
   The fields type available are:
@@ -89,7 +92,7 @@ defmodule IMFastTable do
   - `:path`: The path filename where the table will be flushed. Ignored if `autosave: false`.
   - `:gc_period`: Garbage collector period. Default 60_000 miliseconds (1 minute).
   """
-  @spec new(name :: atom(), fields :: keyword(), opts :: keyword()) :: atom() | :ets.tid()
+  @spec new(name :: atom(), fields :: keyword(), opts :: keyword()) :: :ets.tid()
   def new(table_name, fields, options \\ []) do
     autosave = Keyword.get(options, :autosave, false)
     path = Keyword.get(options, :path, nil)
@@ -99,7 +102,7 @@ defmodule IMFastTable do
 
     fields = fields ++ [{:sys_flag, :indexed_non_uniq}]
 
-    cond do
+    table = cond do
       autosave and not is_binary(path) ->
         raise(ArgumentError, message: "Bad options: 'autosave = true' make mandatory 'path' parameter")
 
@@ -126,9 +129,10 @@ defmodule IMFastTable do
         new_indexes(table_name, fields)
         table
     end
-    {:ok, ref} = :timer.apply_interval(gc_period, fn ->
+    {:ok, _ref} = :timer.apply_interval(gc_period, fn ->
       garbage_collector(table_name)
     end)
+    table
   end
   defp new_indexes(_, []), do: :ok
   defp new_indexes(table_name, [field | fields]) when not is_tuple(field),
@@ -221,15 +225,25 @@ defmodule IMFastTable do
   """
   @spec delete(table :: atom() | :ets.tid(), primary_key :: any()) :: :not_found | integer()
   def delete(table, primary_key) do
+    fields = Keyword.get(:ets.lookup(table, :fields), :fields)
+    [ {primary_key_field, _} | _ ] = fields
     pattern = table
       |> build_pattern()
       |> String.replace("sys_flag", "_sys_flag")
     return = String.replace(pattern, "_sys_flag", ":deleted")
+    guard = "#{primary_key_field} == #{primary_key}"
 
-    case :ets.select_replace(table, filter_string(pattern, "mac == #{primary_key}", return)) do
+    case :ets.select_replace(table, filter_string(pattern, guard, return)) do
       0 -> :not_found
       count -> count
     end
+    [cur_rec] = :ets.select(table, filter_string(pattern, guard, pattern |> String.replace(", _sys_flag", "")))
+    remove_indexes(
+      table,
+      cur_rec |> Tuple.to_list() |> :lists.enumerate(),
+      fields,
+      primary_key
+    )
   end
 
   ### delete/3
@@ -264,8 +278,8 @@ defmodule IMFastTable do
   """
   @spec delete_range(table :: atom() | :ets.tid(), from :: any(), to :: any()) :: :ok
   def delete_range(table, from, to) do
-    [ primary_key_field | _ ] = Keyword.get(:ets.lookup(table, :fields), :fields)
-    guard = "#{primary_key_field} >= #{from} and #{primary_key_field} <= #{from}"
+    [ {primary_key_field, _} | _ ] = Keyword.get(:ets.lookup(table, :fields), :fields)
+    guard = "#{primary_key_field} >= #{from} and #{primary_key_field} <= #{to}"
     custom_delete(table, :full, guard)
   end
 
@@ -302,17 +316,19 @@ defmodule IMFastTable do
     pattern = String.replace(pattern, "sys_flag", "_sys_flag")
     return = String.replace(pattern, "_sys_flag", ":deleted")
     :ets.select_replace(table, filter_string(pattern, guard, return))
-    [ primary_key_field | _ ] = Keyword.get(:ets.lookup(table, :fields), :fields)
 
-    deleted = :ets.select(table, filter_string(return, "", primary_key_field))
-      |> Enum.map(fn {k} -> k end)
-    table_index = get_table_index_name(:ets.info(table, :name), sys_flag)
+    [ {primary_key_field, _} | _ ] = Keyword.get(:ets.lookup(table, :fields), :fields)
+
+    pattern = build_pattern(table, "#{guard} #{primary_key_field} sys_flag")
+      |> String.replace("sys_flag", ":deleted")
+    deleted = :ets.select(table, filter_string(pattern, guard, primary_key_field))
+    table_index = get_table_index_name(:ets.info(table, :name), :sys_flag)
     :ets.insert(table_index, {:deleted, deleted})
 
-    return = String.replace(pattern, ":deleted", ":ok")
-    ok = :ets.select(table, filter_string(return, "", primary_key_field))
-      |> Enum.map(fn {k} -> k end)
+    pattern = String.replace(pattern, ":deleted", ":ok")
+    ok = :ets.select(table, filter_string(pattern, "", primary_key_field))
     :ets.insert(table_index, {:ok, ok})
+    :ok
   end
 
   ### count/1
@@ -322,7 +338,7 @@ defmodule IMFastTable do
   @spec count(table :: atom() | :ets.tid()) :: integer()
   def count(table) do
     pattern = table
-      |> build_pattern()
+      |> build_pattern("sys_flag")
       |> String.replace("sys_flag", ":ok")
 
     :ets.select_count(table, filter_string(pattern, "", "true"))
@@ -390,15 +406,30 @@ defmodule IMFastTable do
     get_range(table, field_name, from, to, Enum.into(opts, %{}))
   def get_range(table, field_name, from, to, %{return: :records} = opts) do
     get_range(table, field_name, from, to, %{opts|return: :keys})
-      |> Enum.map(fn {_, primary_key} -> get(table, primary_key) end)
+      |> Enum.map(fn
+        {_, primary_key} -> get(table, primary_key)
+        record -> record
+      end)
   end
   def get_range(table, field_name, from, to, opts) do
-    table_index = get_table_index_name(:ets.info(table, :name), field_name)
-    filter = [{{:"$1", :_}, [{:andalso, {:>=, :"$1", from}, {:<, :"$1", to}}], [:"$_"]}]
-    case Map.get(opts, :limit, :infinity) do
-      :infinity -> :ets.select(table_index, filter)
-      limit when is_integer(limit) -> :ets.select(table_index, filter, limit) |> elem(0)
-      _ -> :ets.select(table_index, filter)
+    [ {primary_key_field, _} | _ ] = Keyword.get(:ets.lookup(table, :fields), :fields)
+    if field_name == primary_key_field do
+      pattern = build_pattern(table, "#{primary_key_field} sys_flag")
+        |> String.replace("sys_flag", ":ok")
+      filter = filter_string(pattern, "#{primary_key_field} >= #{from} and #{primary_key_field} <= #{to}")
+      case Map.get(opts, :limit, :infinity) do
+        :infinity -> :ets.select(table, filter)
+        limit when is_integer(limit) -> :ets.select(table, filter, limit) |> elem(0)
+        _ -> :ets.select(table, filter)
+      end
+    else
+      table_index = get_table_index_name(:ets.info(table, :name), field_name)
+      filter = filter_string("{k, pk}", "k >= #{from} and k <= #{to}")
+      case Map.get(opts, :limit, :infinity) do
+        :infinity -> :ets.select(table_index, filter)
+        limit when is_integer(limit) -> :ets.select(table_index, filter, limit) |> elem(0)
+        _ -> :ets.select(table_index, filter)
+      end
     end
   end
 
@@ -499,27 +530,19 @@ defmodule IMFastTable do
     [result | remove_indexes(table, datas, fields, primary_key) ]
   end
 
-  ### remove/3
-  # For use in future features. Anyway, you can call this function directly just as any other
-  # api call.
-  @doc false
-  @spec remove(table :: atom() | :ets.tid(), field_name :: atom(), key :: any()) :: :ok
-  def remove(table, field_name, key) do
-    table_index = get_table_index_name(:ets.info(table, :name), field_name)
-    :ets.lookup(table_index, key)
-      |> Enum.each(fn {_, primary_key} ->
-           remove(table, primary_key)
-         end)
-  end
-
   ### garbage_collector/1
   # For internar use. The module will run every :gc_period this function. Anyway, you can call
   # directly this function at will.
   @doc false
   @spec garbage_collector(table :: atom() | :ets.tid()) :: integer()
   def garbage_collector(table) do
-    [{_, list}] = get(table, :sys_flag, :deleted, return: :keys)
-    garbage_collector_remover(table, list)
+    [ {primary_key_field, _} | _ ] = Keyword.get(:ets.lookup(table, :fields), :fields)
+    pattern = build_pattern(table, "sys_flag #{primary_key_field}")
+      |> String.replace("sys_flag", ":deleted")
+    case custom_search(table, pattern, "", primary_key_field) do
+      [] -> 0
+      list -> garbage_collector_remover(table, list)
+    end
   end
   defp garbage_collector_remover(table, list, count \\ 0)
   defp garbage_collector_remover(_, [], count), do: count
@@ -548,10 +571,15 @@ defmodule IMFastTable do
     :ets.select(table, filter_string(pattern, guard, return))
   end
 
+  def list_table_indexes(table) do
+    Keyword.get(:ets.lookup(table, :fields), :fields)
+      |> Enum.map(fn {k, _} -> get_table_index_name(:ets.info(table, :name), k) end)
+  end
+
   ################################################################################
   # Small helpers
   ################################################################################
-  defp build_pattern(table, guard \\ nil) do
+  def build_pattern(table, guard \\ nil) do
     fields = Keyword.get(:ets.lookup(table, :fields), :fields)
     guard =
       if guard != nil do

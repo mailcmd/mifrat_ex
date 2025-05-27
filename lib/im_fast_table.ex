@@ -491,6 +491,19 @@ defmodule IMFastTable do
     end
   end
 
+  ### record_to_map/2
+  @doc """
+  Convert a tuple record into a map
+  """
+  @spec record_to_map(record :: tuple(), table :: atom() | :ets.tid()) :: map()
+  def record_to_map(record, table) do
+    Keyword.get(:ets.lookup(table, :fields), :fields)
+      |> Enum.map(fn {f, t} -> f end)
+      |> :lists.enumerate()
+      |> Enum.map(fn {i, k} -> {k, elem(record, i-1)} end)
+      |> Enum.into(%{})
+  end
+
   ### store/2
   @doc """
   Flush the table to disk in the pathname.

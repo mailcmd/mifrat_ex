@@ -496,6 +496,7 @@ defmodule IMFastTable do
   Convert a tuple record into a map
   """
   @spec record_to_map(record :: tuple(), table :: atom() | :ets.tid()) :: map()
+  def record_to_map(record, _) when not is_tuple(record), do: record
   def record_to_map(record, table) do
     Keyword.get(:ets.lookup(table, :fields), :fields)
       |> Enum.map(fn {f, t} -> f end)

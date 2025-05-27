@@ -518,7 +518,9 @@ defmodule IMFastTable do
       {:ok, table}
     else
       {:error, reason} -> {:error, reason}
-      {table, false} ->  reindex(table)
+      {table, false} ->
+        reindex(table)
+        {:ok, table}
     end
   end
   defp load_indexes(table, pathname) do

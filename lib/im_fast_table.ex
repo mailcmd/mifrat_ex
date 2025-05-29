@@ -674,7 +674,7 @@ defmodule IMFastTable do
     custom_update(table, pattern, guard, return)
   end
   def custom_update(table, pattern, guard, return) do
-    :ets.select_update(table, filter_string(pattern, guard, return))
+    :ets.select_replace(table, filter_string(pattern, guard, return))
   end
 
   def list_table_indexes(table, type \\ [:indexed, :indexed_non_uniq]) do

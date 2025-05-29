@@ -641,13 +641,6 @@ defmodule IMFastTable do
 
     result
   end
-  # defp garbage_collector_remover(table, list, count \\ 0)
-  # defp garbage_collector_remover(_, [], count), do: count
-  # defp garbage_collector_remover(table, [primary_key | rest], count) do
-  #   remove(table, primary_key)
-  #   garbage_collector_remover(table, rest, count + 1)
-  # end
-
 
   ### custom_filter/3
   # For use in future features. Anyway, you can call this function directly just as any other
@@ -659,6 +652,8 @@ defmodule IMFastTable do
   end
 
   ### custom_search/4
+  # For internar use. Anyway, you can call  directly this function at will.
+  @doc false
   def custom_search(table, pattern \\ :full, guard \\ "true", return \\ "full_record")
   def custom_search(table, :full, guard, return) do
     pattern = build_pattern(table)
@@ -666,6 +661,20 @@ defmodule IMFastTable do
   end
   def custom_search(table, pattern, guard, return) do
     :ets.select(table, filter_string(pattern, guard, return))
+  end
+
+  ### custom_update/4
+  # For internar use. Anyway, you can call  directly this function at will.
+  # WARNING: Do not use this function to update fields that are :indexed or :indexed_non_uniq
+  # TODO: raise an error if you try to update a field :indexed or :indexed_non_uniq
+  @doc false
+  def custom_update(table, pattern \\ :full, guard \\ "true", return \\ "full_record")
+  def custom_update(table, :full, guard, return) do
+    pattern = build_pattern(table)
+    custom_update(table, pattern, guard, return)
+  end
+  def custom_update(table, pattern, guard, return) do
+    :ets.select_update(table, filter_string(pattern, guard, return))
   end
 
   def list_table_indexes(table, type \\ [:indexed, :indexed_non_uniq]) do

@@ -499,7 +499,7 @@ defmodule IMFastTable do
   def record_to_map(record, _) when not is_tuple(record), do: record
   def record_to_map(record, table) do
     Keyword.get(:ets.lookup(table, :fields), :fields)
-      |> Enum.map(fn {f, t} -> f end)
+      |> Enum.map(fn {f, _} -> f end)
       |> :lists.enumerate()
       |> Enum.map(fn {i, k} -> {k, elem(record, i-1)} end)
       |> Enum.into(%{})
@@ -727,9 +727,9 @@ defmodule IMFastTable do
     Enum.find_index(keyword_list, fn {_,t} -> t == :primary_key end) + 1
   end
 
-  defp find_field_idx(keyword_list, field_name) do
-    Enum.find_index(keyword_list, fn {f,_} -> f == field_name end) + 1
-  end
+  # defp find_field_idx(keyword_list, field_name) do
+  #   Enum.find_index(keyword_list, fn {f,_} -> f == field_name end) + 1
+  # end
 
   defp get_table_index_name(table_name, field_name) do
     table_name

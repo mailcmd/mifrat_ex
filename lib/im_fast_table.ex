@@ -583,6 +583,17 @@ defmodule IMFastTable do
     reindex_indexes(table, fields)
   end
 
+  ### remove_all/1
+  @doc """
+  WARNING!!! This function remove physically every record in the main table and the index tables.
+  """
+  @spec remove_all(table :: atom() | :ets.tid()) :: :ok
+  def remove_all(table) do
+    :ets.delete_all_objects(table)
+    list_table_indexes()
+      |> Enum.each(fn t -> :ets.delete_all_objects(t) end)
+  end
+
   ### remove/2
   # For internar use by the garbage collector. Anyway, you can call this function directly just as
   # any other api call.

@@ -9,7 +9,7 @@ defmodule IMFastTable do
   # Macros
   ################################################################################
   defmacro filter_string(pattern, guard \\ "true", return \\ "full_record") do
-    quote do
+    quote generated: true do
       f =
         Code.eval_string("""
         fn #{unquote(pattern)} #{unquote(return) == "full_record" && " = full_record" || ""}
@@ -22,7 +22,7 @@ defmodule IMFastTable do
   end
 
   defmacro filter(pattern, guard \\ true, return \\ quote do: full_record) do
-    quote do
+    quote generated: true do
       f =
         fn unquote(pattern) = full_record when unquote(guard) ->
           unquote(return)

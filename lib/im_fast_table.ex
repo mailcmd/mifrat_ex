@@ -590,7 +590,7 @@ defmodule IMFastTable do
   @spec remove_all(table :: atom() | :ets.tid()) :: :ok
   def remove_all(table) do
     :ets.delete_all_objects(table)
-    list_table_indexes()
+    list_table_indexes(table)
       |> Enum.each(fn t -> :ets.delete_all_objects(t) end)
   end
 

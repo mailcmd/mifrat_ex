@@ -519,7 +519,7 @@ defmodule IMFastTable do
       {:ok, table}
     else
       {:error, reason} -> {:error, reason}
-      {table, false} ->
+      {_table, false} ->
         # reindex(table)
         # {:ok, table}
         {:error, "Table indexes problem!"}

@@ -101,8 +101,6 @@ defmodule IMFastTable do
     # :gc_period random offset is to reduce risk of collision with :autosave
     gc_period = Keyword.get(options, :gc_period, 60_000) + Enum.random(5000..10000)
 
-    # XXX
-    # fields = fields ++ [{:sys_flag, :indexed_non_uniq}]
     fields = fields ++ [{:sys_flag, :unindexed}]
 
     table = cond do
@@ -147,8 +145,6 @@ defmodule IMFastTable do
     do: new_indexes(table_name, fields)
   defp new_indexes(table_name, [{field_name, :indexed_non_uniq} | fields]) do
     index_name = get_table_index_name(table_name, field_name)
-    # XXX
-    # :ets.new(index_name, [:ordered_set, :public, :named_table, read_concurrency: true, write_concurrency: true])
     :ets.new(index_name, [:bag, :public, :named_table, read_concurrency: true, write_concurrency: true])
     new_indexes(table_name, fields)
   end
@@ -219,19 +215,10 @@ defmodule IMFastTable do
       {_, index_type} when index_type in [:primary_key, :unindexed] ->
         :skip
 
-      # XXX
-      # {field_name, index_type} when index_type == :indexed ->
       {field_name, index_type} when index_type in [:indexed, :indexed_non_uniq] ->
         table_index = get_table_index_name(:ets.info(table, :name), field_name)
         :ets.insert(table_index, {data, primary_key})
 
-      # XXX
-      # {field_name, index_type} when index_type == :indexed_non_uniq ->
-      #   table_index = get_table_index_name(:ets.info(table, :name), field_name)
-      #   case :ets.lookup(table_index, data) do
-      #     [{^data, list}] -> :ets.insert(table_index, {data, [primary_key | list]})
-      #     [] -> :ets.insert(table_index, {data, [primary_key]})
-      #   end
     end
     [result | insert_indexes(table, datas, fields, primary_key) ]
   end

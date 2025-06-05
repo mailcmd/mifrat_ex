@@ -299,7 +299,7 @@ defmodule IMFastTable do
     custom_delete(table, build_pattern(table), guard)
   end
   def custom_delete(table, pattern, guard) do
-    return = build_pattern(table)
+    # return = build_pattern(table)
     :ets.select(table, filter_string(pattern, guard))
       |> Enum.map(fn tuple ->
         delete(table, elem(tuple, 0))

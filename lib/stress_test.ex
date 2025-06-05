@@ -13,7 +13,6 @@ defmodule IMFastTable.StressTest do
       year: :indexed_non_uniq,
       phone: :indexed
     ], [
-      gc_period: 60_000,
       autosave: true,
       path: "/tmp/table.ets",
       initial_load: true
@@ -46,7 +45,6 @@ defmodule IMFastTable.StressTest do
       category: :indexed_non_uniq,
       dni: :indexed
     ], [
-      gc_period: 60_000
     ])
 
     phone15 = random_phone();
@@ -132,18 +130,18 @@ defmodule IMFastTable.StressTest do
 
     # custom_count/2
     IO.inspect(
-      custom_count(table, "{_, _, _, _, 2, _, _}"),
-      label: "\nCUSTOM_COUNT/2 ({_, _, _, _, 2, _, _})\n"
+      custom_count(table, "{_, _, _, _, 2, _}"),
+      label: "\nCUSTOM_COUNT/2 ({_, _, _, _, 2, _})\n"
     )
 
     # custom_count/3
     IO.inspect(
-      custom_count(table, "{_, _, year, _, cat, _, _}", "year < 1980 and cat == 2"),
-      label: "\nCUSTOM_COUNT/3 ({_, _, year, _, cat, _, _} -> year < 1980 and cat == 2)\n"
+      custom_count(table, "{_, _, year, _, cat, _}", "year < 1980 and cat == 2"),
+      label: "\nCUSTOM_COUNT/3 ({_, _, year, _, cat, _} -> year < 1980 and cat == 2)\n"
     )
 
     IO.puts "\nTesting 'delete/2';\nCurrent status:"
-    {_id, _name, year, phone, category, dni, _} = get(table, 15)
+    {_id, _name, year, phone, category, dni} = get(table, 15)
     year_list = get(table, :year, year, return: :keys)
     category_list = get(table, :category, category, return: :keys)
     phone_list = get(table, :phone, phone, return: :keys)
@@ -183,7 +181,7 @@ defmodule IMFastTable.StressTest do
     IO.puts "\nTeting 'delete/3':\nStatus deleting year: #{year}..."
     delete(table, :year, year)
     IO.inspect(
-      custom_search(table, "{_, _, _, _, _, _, :ok}"),
+      custom_search(table, "{_, _, _, _, _, _}"),
       label: "Without year #{year}\n"
     )
 
@@ -202,12 +200,12 @@ defmodule IMFastTable.StressTest do
     insert(table, {14, random_name(), 1980, random_phone(), 2, random_phone()})
     insert(table, {15, random_name(), 1980, phone15, 1, dni15})
     insert(table, {16, random_name(), 1980, random_phone(), 2, random_phone()})
-    IO.inspect(custom_search(table, "{_, _, _, _, _, _, :ok}"))
+    IO.inspect(custom_search(table, "{_, _, _, _, _, _}"))
 
     IO.puts "\nTeting 'delete_list/2':\nStatus deleting: #{inspect([13,14,15,16], charlists: :as_lists)}..."
     delete_list(table, [13,14,15,16])
     IO.inspect(
-      custom_search(table, "{_, _, _, _, _, _, :ok}")
+      custom_search(table, "{_, _, _, _, _, _}")
     )
 
     IO.puts "\nInserting again #{inspect([13,14,15,16], charlists: :as_lists)}..."
@@ -215,12 +213,12 @@ defmodule IMFastTable.StressTest do
     insert(table, {14, random_name(), 1980, random_phone(), 2, random_phone()})
     insert(table, {15, random_name(), 1980, phone15, 1, dni15})
     insert(table, {16, random_name(), 1980, random_phone(), 2, random_phone()})
-    IO.inspect(custom_search(table, "{_, _, _, _, _, _, :ok}"))
+    IO.inspect(custom_search(table, "{_, _, _, _, _, _}"))
 
     IO.puts "\nTeting 'delete_range/3':\nStatus deleting from 8 to 12 ..."
     delete_range(table, 8, 12)
     IO.inspect(
-      custom_search(table, "{_, _, _, _, _, _, :ok}")
+      custom_search(table, "{_, _, _, _, _, _}")
     )
 
     IO.puts "\nInserting again 8 to 12..."
@@ -230,24 +228,12 @@ defmodule IMFastTable.StressTest do
     insert(table, {11, random_name(), 1970, random_phone(), 1, random_phone()})
     insert(table, {12, random_name(), 1970, random_phone(), 2, random_phone()})
     IO.inspect(
-      custom_search(table, "{_, _, _, _, _, _, :ok}")
+      custom_search(table, "{_, _, _, _, _, _}")
     )
 
     IO.puts "\nTeting 'delete_range/3':\nStatus deleting from 2 to 12 ..."
     delete_range(table, 2, 12)
     IO.inspect(:ets.tab2list(table))
-    IO.inspect(
-      list_table_indexes(table)
-        |> Enum.map( &(:ets.tab2list(&1)) )
-    )
-
-    # IO.puts "\nStatus after garbage collector..."
-    # IO.inspect(garbage_collector(table), label: "PURGED")
-    # IO.inspect(:ets.tab2list(table))
-    # IO.inspect(
-    #   list_table_indexes(table)
-    #     |> Enum.map( &(:ets.tab2list(&1)) )
-    # )
 
 
     :ready

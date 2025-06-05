@@ -108,7 +108,7 @@ defmodule IMFastTable do
           {:ok, table} ->
             table
           {:error, _} ->
-            table = :ets.new(table_name, [:bag, :public, :named_table, read_concurrency: true, write_concurrency: true])
+            table = :ets.new(table_name, [:ordered_set, :public, :named_table, read_concurrency: true, write_concurrency: true])
             :ets.insert(table, {:_fields, fields})
             table
         end
@@ -120,7 +120,7 @@ defmodule IMFastTable do
         table
 
       true ->
-        table = :ets.new(table_name, [:bag, :public, :named_table, read_concurrency: true, write_concurrency: true])
+        table = :ets.new(table_name, [:ordered_set, :public, :named_table, read_concurrency: true, write_concurrency: true])
         :ets.insert(table, {:_fields, fields})
         table
     end
@@ -192,11 +192,18 @@ defmodule IMFastTable do
       {_, index_type} when index_type in [:primary_key, :unindexed] ->
         :skip
 
-      {field_name, index_type} when index_type in [:indexed, :indexed_non_uniq] ->
+      {field_name, index_type} when index_type == :indexed ->
         table_index = get_table_index_name(field_name)
         :ets.insert(table, {{table_index, data}, primary_key})
 
-    end
+      {field_name, index_type} when index_type  == :indexed_non_uniq ->
+        table_index = get_table_index_name(field_name)
+        new_list = case get(table, {table_index, data}) do
+          {_, pk_list} -> [ primary_key | pk_list ]
+          :not_found -> [ primary_key ]
+        end
+        :ets.insert(table, {{table_index, data}, new_list})
+      end
     [result | insert_indexes(table, datas, fields, primary_key) ]
   end
 
@@ -232,8 +239,11 @@ defmodule IMFastTable do
 
       {field_name, :indexed_non_uniq} ->
         table_index = get_table_index_name(field_name)
-        :ets.delete_object(table, {{table_index, data}, primary_key})
-
+        {_, pk_list} = get(table, {table_index, data})
+        case List.delete(pk_list, primary_key) do
+          [] -> :ets.delete(table, {table_index, data})
+          new_list -> :ets.insert(table, {{table_index, data}, new_list})
+        end
     end
 
     [result | delete_indexes(table, datas, fields, primary_key) ]

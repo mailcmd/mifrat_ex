@@ -12,7 +12,7 @@ defmodule IMFastTable do
     quote generated: true do
       f =
         Code.eval_string("""
-        fn #{unquote(pattern)} #{unquote(return) == "full_record" && " = full_record" || ""}
+        fn (#{unquote(pattern)} #{unquote(return) == "full_record" && " = full_record" || ""})
            #{unquote(guard) in ["", "true"] && "" || " when #{unquote(guard)}"} ->
           #{unquote(return)}
         end
@@ -300,7 +300,7 @@ defmodule IMFastTable do
   end
   def custom_delete(table, pattern, guard) do
     return = build_pattern(table)
-    :ets.select(table, filter_string(pattern, guard, return))
+    :ets.select(table, filter_string(pattern, guard))
       |> Enum.map(fn tuple ->
         delete(table, elem(tuple, 0))
       end)

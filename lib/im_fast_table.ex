@@ -257,9 +257,14 @@ defmodule IMFastTable do
   @spec delete(table :: atom() | :ets.tid(), field_name :: atom(), key :: any()) :: integer()
   def delete(table, field_name, key) do
     table_index = get_table_index_name(field_name)
-    :ets.lookup(table, {table_index, key})
-      |> Enum.map(fn {_, pk} -> delete(table, pk) end)
-      |> length()
+    case :ets.lookup(table, {table_index, key}) do
+      [{_, list}] when is_list(list) ->
+        delete_list(table, list)
+        length(list)
+      [{_, pk}] ->
+        delete(table, pk)
+        1
+    end
   end
 
   ### delete_list/2

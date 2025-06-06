@@ -211,7 +211,7 @@ defmodule IMFastTable do
   @doc """
   Delete a record by primary_key
   """
-  @spec delete(table :: atom() | :ets.tid(), primary_key :: any()) :: :not_found | integer()
+  @spec delete(table :: atom() | :ets.tid(), primary_key :: any()) :: :not_found | :ok
   def delete(table, primary_key) do
     fields = Keyword.get(:ets.lookup(table, :_fields), :_fields)
     current_record = :ets.lookup(table, primary_key)
@@ -239,10 +239,16 @@ defmodule IMFastTable do
 
       {field_name, :indexed_non_uniq} ->
         table_index = get_table_index_name(field_name)
-        {_, pk_list} = get(table, {table_index, data})
-        case List.delete(pk_list, primary_key) do
-          [] -> :ets.delete(table, {table_index, data})
-          new_list -> :ets.insert(table, {{table_index, data}, new_list})
+        with {_, pk_list} <- get(table, {table_index, data}),
+             [] <- List.delete(pk_list, primary_key) do
+          :ets.delete(table, {table_index, data})
+          :ok
+        else
+          :not_found ->
+            :not_found
+          new_list ->
+            :ets.insert(table, {{table_index, data}, new_list})
+            :ok
         end
     end
 

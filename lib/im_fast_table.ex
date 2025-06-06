@@ -484,7 +484,7 @@ defmodule IMFastTable do
   @doc false
   def reindex(table) do
     fields = Keyword.get(:ets.lookup(table, :_fields), :_fields)
-    :ets.select_delete(table, filter_string("{_, _}", "", "true"))
+    :ets.select_delete(table, filter_string("{pk, _}", "pk not in [:_autosave, :_fields]", "true"))
 
     :ets.tab2list(table)
       |> Stream.filter(fn record -> elem(record, 0) not in [:_autosave, :_fields] end)

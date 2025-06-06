@@ -215,17 +215,17 @@ defmodule IMFastTable do
   def delete(table, primary_key) do
     fields = Keyword.get(:ets.lookup(table, :_fields), :_fields)
     current_record = :ets.lookup(table, primary_key)
-      |> hd()
-      |> Tuple.to_list()
-      |> :lists.enumerate()
-
-    :ets.delete(table, primary_key)
-    delete_indexes(
-      table,
-      current_record,
-      fields,
-      primary_key
-    )
+    if current_record != [] do
+      :ets.delete(table, primary_key)
+      delete_indexes(
+        table,
+        current_record |> hd() |> Tuple.to_list() |> :lists.enumerate(),
+        fields,
+        primary_key
+      )
+    else
+      :not_found
+    end
   end
   defp delete_indexes(_, [], _, _), do: []
   defp delete_indexes(table, [ {idx, data} | datas ], fields, primary_key) do
@@ -240,15 +240,15 @@ defmodule IMFastTable do
       {field_name, :indexed_non_uniq} ->
         table_index = get_table_index_name(field_name)
         with {_, pk_list} <- get(table, {table_index, data}),
-             [] <- List.delete(pk_list, primary_key) do
-          :ets.delete(table, {table_index, data})
+             new_list when is_list(new_list) <- List.delete(pk_list, primary_key) do
+          if new_list == [] do
+            :ets.delete(table, {table_index, data})
+          else
+            :ets.insert(table, {{table_index, data}, new_list})
+          end
           :ok
         else
-          :not_found ->
-            :not_found
-          new_list ->
-            :ets.insert(table, {{table_index, data}, new_list})
-            :ok
+          _ -> :not_found
         end
     end
 

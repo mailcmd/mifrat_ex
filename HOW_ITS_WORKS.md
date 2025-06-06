@@ -2,15 +2,14 @@
 
 ## About the storage structure
 
-The table is created by detailing the fields. The name of the field, the type of field (if it is PK, 
-IDX or IDX_NOT_UNIQ) and the order in which they are declared are important. 
-From there, internal table records are created that detail the structure and 
-holds certain metadata that allows the table to be managed. 
-For every extra index of the table (not for the PK), when you insert data in the table, an auxiliary 
-record with this structure is inserted in the table.
-
+The table is created by detailing the fields. The name of the field, the type of field (if it is 
+primary_key, indexed or indexed_non_uniq) and the order in which they are declared are important. 
+From there, internal table records are created that detail the structure and holds certain metadata 
+that allows the table to be managed. 
+For every extra index of the table (not for the primary_key), when you insert data in the table, an auxiliary 
+record with the following structure is inserted in the table:
 ```
-{{:_<field_name>_index, idx_value}, primary_key}
+{{:_<field_name>_index, idx_value}, <primaries_keys_reference>}
 ```
 
 ## Insertion
@@ -43,7 +42,7 @@ This causes the following actions:
 ```
 2. Add a index record for year:
 ```
-{{:_year_index, 1972}, 1}
+{{:_year_index, 1972}, [1]}
 ``` 
 3. Add a index record for phone:
 ```
@@ -55,7 +54,7 @@ At this point we would have the table with the following information:
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
-|{{:_year_index, 1972}, 1}|
+|{{:_year_index, 1972}, [1]}|
 |{{:_phone_index, 2915031105}, 1}|
 
 If we now add other records:
@@ -66,10 +65,10 @@ If we now add other records:
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
 |{1, "Carlos Poncho", 1972, 2915031105}| 
-|{{:_year_index, 1972}, 1}|
+|{{:_year_index, 1972}, [1]}|
 |{{:_phone_index, 2915031105}, 1}|
 |{2, "Juan de las Pelotas", 1976, 2915010203}|
-|{{:_year_index, 1976}, 2}|
+|{{:_year_index, 1976}, [2]}|
 |{{:_phone_index, 2915010203}, 2}|
 
 And then we add another one:
@@ -79,13 +78,12 @@ And then we add another one:
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
-|{{:_year_index, 1972}, 1}|
+|{{:_year_index, 1972}, [1, 3]}|
 |{{:_phone_index, 2915031105}, 1}|
 |{2, "Juan de las Pelotas", 1976, 2915010203}|
-|{{:_year_index, 1976}, 2}|
+|{{:_year_index, 1976}, [2]}|
 |{{:_phone_index, 2915010203}, 2}|
 |{3, "Pablo Marmol", 1972, 2915040506}|
-|{{:_year_index, 1972}, 3}|
 |{{:_phone_index, 2915040506}, 3}|
 
 ## Update
@@ -103,12 +101,14 @@ The table would now look like this:
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
-|{{:_year_index, 1972}, 1}|
+|{{:_year_index, 1972}, [1, 2, **3**]}|
 |{{:_phone_index, 2915031105}, 1}|
 |{2, "Juan de las Pelotas", **1972**, **2915012233**}|
-|{{:_year_index, **1972**}, 2}|
 |{{:_phone_index, **2915012233**}, 2}|
 |{3, "Pablo Marmol", 1972, 2915040506}|
-|{{:_year_index, 1972}, 3}|
 |{{:_phone_index, 2915040506}, 3}|
 
+... and so on.
+
+I can guess that you can imagine what would do the delete action, so I wont explain anything more.
+(Sorry, I'm a lazy documenter) 

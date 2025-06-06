@@ -14,7 +14,7 @@ by adding `i_m_fast_table` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:i_m_fast_table, "~> 0.1.0"}
+    {:i_m_fast_table, "~> 0.2.0"}
   ]
 end
 ```

@@ -2,20 +2,14 @@
 
 ## About the storage structure
 
-The table is created by detailing the fields. The name of the field, the type of field (if it is PK, 
-IDX or IDX_NOT_UNIQ) and the order in which they are declared are important. 
-From there, internal table records are created that detail the structure and 
-holds certain metadata that allows the table to be managed. 
-For each extra index of the table (not for the PK) an auxiliary table is created. For the indexes 
-without repetition a table with this record structure is created:
-
+The table is created by detailing the fields. The name of the field, the type of field (if it is 
+primary_key, indexed or indexed_non_uniq) and the order in which they are declared are important. 
+From there, internal table records are created that detail the structure and holds certain metadata 
+that allows the table to be managed. 
+For every extra index of the table (not for the primary_key), when you insert data in the table, an auxiliary 
+record with the following structure is inserted in the table:
 ```
-{idx_value, primary_key}
-```
-
-For indexes with repetition, a table with this record structure is created:
-```
-{idx_value, [primary_key1, primary_ke2, ...]}
+{{:_<field_name>_index, idx_value}, <primaries_keys_reference>}
 ```
 
 ## Insertion
@@ -25,7 +19,7 @@ Suppose the structure of the table is:
     {:id, :primary_key},
     {:name, :unindexed},
     {:year_of_birth, :indexed_non_uniq},
-    {:phone, indexed}
+    {:phone, :indexed}
 ]
 ```
 
@@ -42,74 +36,55 @@ In an insertion you could add a record such as:
 ```
 This causes the following actions:
 
-1. The index entry of *:year_of_birth* is created/added to the corresponding auxiliary table 
-(*:users_year_of_birdh_index*):
-```
-{1972, [1]}
-```
-2. The index entry of *:phone* is created/added to the corresponding auxiliary table (*:users_phone_index*):
-```
-{2915031105, 1}
-```
-3. The complete record is added to the main table (*:users*):
+1. Add the complete record to the table:
 ```
 {1, "Carlos Poncho", 1972, 2915031105}
+```
+2. Add a index record for year:
+```
+{{:_year_index, 1972}, [1]}
 ``` 
+3. Add a index record for phone:
+```
+{{:_phone_index, 2915031105}, 1}
+```
 
-At this point we would have the tables with the following information:
+At this point we would have the table with the following information:
 
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
+|{{:_year_index, 1972}, [1]}|
+|{{:_phone_index, 2915031105}, 1}|
 
-|users_year_of_birdh_index|
-|-----|
-|{1972, [1]}|
-
-|users_phone_index|
-|-----|
-|{2915031105, 1}|
-
-If we were to add other records:
+If we now add other records:
 ``` 
 {2, "Juan de las Pelotas", 1976, 2915010203}
 ``` 
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
+|{1, "Carlos Poncho", 1972, 2915031105}| 
+|{{:_year_index, 1972}, [1]}|
+|{{:_phone_index, 2915031105}, 1}|
 |{2, "Juan de las Pelotas", 1976, 2915010203}|
+|{{:_year_index, 1976}, [2]}|
+|{{:_phone_index, 2915010203}, 2}|
 
-|users_year_of_birdh_index|
-|-----|
-|{1972, [1]}|
-|{1976, [2]}|
-
-|users_phone_index|
-|-----|
-|{2915031105, 1}|
-|{2915010203, 2}|
-
-And we added another one:
-
+And then we add another one:
 ``` 
 {3, "Pablo Marmol", 1972, 2915040506}
 ``` 
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
+|{{:_year_index, 1972}, [1, 3]}|
+|{{:_phone_index, 2915031105}, 1}|
 |{2, "Juan de las Pelotas", 1976, 2915010203}|
+|{{:_year_index, 1976}, [2]}|
+|{{:_phone_index, 2915010203}, 2}|
 |{3, "Pablo Marmol", 1972, 2915040506}|
-
-|users_year_of_birdh_index|
-|-----|
-|{1972, [3, 1]}|
-|{1976, [2]}|
-
-|users_phone_index|
-|-----|
-|{2915031105, 1}|
-|{2915010203, 2}|
-|{2915040506, 3}|
+|{{:_phone_index, 2915040506}, 3}|
 
 ## Update
 Now let's assume that we want to modify the registry:
@@ -121,55 +96,19 @@ by
 {2, "Juan de las Pelotas", 1972, 2915012233}
 ```
 
-The following happens when updating:
-
-1. First the indexes are updated:
-   
-|users_year_of_birdh_index|
-|-----|
-|{1972, [**2**, 3, 1]}|
-
-|users_phone_index|
-|-----|
-|{2915031105, 1}|
-|{**2915012233**, 2}|
-|{2915040506, 3}|
-
-2. The main register is then updated:
+The table would now look like this:
 
 |users|
 |-----|
 |{1, "Carlos Poncho", 1972, 2915031105}| 
-|{2, "Juan de las Pelotas", 1972, 2915012233}|
+|{{:_year_index, 1972}, [1, 2, **3**]}|
+|{{:_phone_index, 2915031105}, 1}|
+|{2, "Juan de las Pelotas", **1972**, **2915012233**}|
+|{{:_phone_index, **2915012233**}, 2}|
 |{3, "Pablo Marmol", 1972, 2915040506}|
+|{{:_phone_index, 2915040506}, 3}|
 
-## Logical deletion
-Logical deletion does not make the information disappear but marks it for later deletion 
-. If we want to logically delete the record with PK = 3, the indexes would remain the same and the main table
-would look like this:
+... and so on.
 
-|users|
-|-----|
-|{1, "Carlos Poncho", 1972, 2915031105}| 
-|{2, "Juan de las Pelotas", 1972, 2915012233}|
-|~~{3, "Pablo Marmol", 1972, 2915040506}~~|
-
-## Physical deletion
-The physical deletion removes the main record and its references in the indexes. If we want to fiscally delete 
-the record with PK = 3, the tables would look like this:
-
-|users|
-|-----|
-|{1, "Carlos Poncho", 1972, 2915031105}| 
-|{2, "Juan de las Pelotas", 1972, 2915012233}|
-
-|users_year_of_birdh_index|
-|-----|
-|{1972, [2, 1]}|
-
-|users_phone_index|
-|-----|
-|{2915031105, 1}|
-|{2915012233, 2}|
-
-
+I can guess that you can imagine what would do the delete action, so I wont explain anything more.
+(Sorry, I'm a lazy documenter) 

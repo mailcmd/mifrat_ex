@@ -437,10 +437,10 @@ defmodule IMFastTable do
   @doc """
   Convert a tuple record into a map. If the first argument is not a tuple return just this value.
   That is because many times the record is possible that come from a `get` and can take value
-  :not_found. 
+  :not_found.
   """
   @spec record_to_map(record :: tuple(), table :: atom() | :ets.tid()) :: map()
-  def record_to_map(record, table) when not is_tuple(record), do: record
+  def record_to_map(record, _table) when not is_tuple(record), do: record
   def record_to_map(record, table) do
     Keyword.get(:ets.lookup(table, :_fields), :_fields)
       |> Enum.map(fn {f, _} -> f end)

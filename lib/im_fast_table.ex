@@ -40,7 +40,7 @@ defmodule IMFastTable do
   Delete the table and his indexes. No data survive this process. If the table has enable
   **autosave**, before delete the data will be flushed to disk (see `new/3`).
   """
-  @spec destroy(atom() | :ets.tid()) :: true
+  @spec destroy(atom() | :ets.tid()) :: :ok | :error
   def destroy(table) do
     # if autosave: true cancel autosave timer
     case :ets.lookup(table, :_autosave) do
@@ -55,7 +55,7 @@ defmodule IMFastTable do
     # :timer.cancel(ref)
 
     # delete the main table
-    :ets.delete(table)
+    :ets.delete(table) && :ok || :error
   end
 
   ### new/2 | new/3
@@ -69,7 +69,7 @@ defmodule IMFastTable do
     year: :indexed_non_uniq,
     phone: :indexed
   ], [
-    gc_period: 3_600_000 # 1 hour
+    ...opts...
   ])
   ```
   The fields type available are:
@@ -86,7 +86,6 @@ defmodule IMFastTable do
   - `:path`: The path filename where the table will be flushed. Ignored if `autosave: false`.
   - `:initial_load`: If `true` and `autosave: true` will try to load from `:path` the table. Ignored
   if `autosave: false`. Default is `true`.
-  - `:_gc_period`: Garbage collector period. Default 60_000 miliseconds (1 minute).
   """
   @spec new(name :: atom(), fields :: keyword(), opts :: keyword()) :: :ets.tid()
   def new(table_name, fields, options \\ []) do
@@ -258,7 +257,7 @@ defmodule IMFastTable do
 
   ### delete/3
   @doc """
-  Delete a record by a secondary_key
+  Delete one or more records by a secondary_key
   """
   @spec delete(table :: atom() | :ets.tid(), field_name :: atom(), key :: any()) :: integer()
   def delete(table, field_name, key) do
@@ -286,7 +285,7 @@ defmodule IMFastTable do
 
   ### delete_range/3
   @doc """
-  Delete a range of records referenced by its primary key.
+  Delete a bunch of records referenced by a range of its primary key.
   """
   @spec delete_range(table :: atom() | :ets.tid(), from :: any(), to :: any()) :: :ok
   def delete_range(table, from, to) do
@@ -300,7 +299,7 @@ defmodule IMFastTable do
 
   ### delete_range/4
   @doc """
-  Delete a range of records referenced by a secondary key.
+  Delete a bunch of records referenced by a range of one of its secondary indexes keys.
   """
   @spec delete_range(table :: atom() | :ets.tid(), field_name :: atom(),
                      from :: any(), to :: any()) :: integer()
@@ -315,19 +314,23 @@ defmodule IMFastTable do
   @doc """
   WARNING!!! This function remove physically every record in the table.
   """
-  @spec delete_all(table :: atom() | :ets.tid()) :: :ok
+  @spec delete_all(table :: atom() | :ets.tid()) :: :ok | :error
   def delete_all(table) do
     [fields] = :ets.lookup(table, :_fields)
     [autosave] = :ets.lookup(table, :_autosave)
-    :ets.delete_all_objects(table)
-    :ets.insert(table, fields)
-    :ets.insert(table, autosave)
+    if :ets.delete_all_objects(table) do
+      :ets.insert(table, fields)
+      :ets.insert(table, autosave)
+      :ok
+    else
+      :error
+    end
   end
 
   ### custom_delete/3
   @doc false
   # For internal use.
-  # The patter MUST include all fields name in order.
+  # REMEMBER: The pattern MUST include all fields name in order.
   @spec custom_delete(table :: atom() | :ets.tid(), :full | String.t(), String.t()) :: integer()
   def custom_delete(table, :full, guard) do
     custom_delete(table, build_pattern(table), guard)
@@ -343,7 +346,7 @@ defmodule IMFastTable do
 
   ### count/1
   @doc """
-  Return the count of records not marked as deleted.
+  Return the number of records of the table.
   """
   @spec count(table :: atom() | :ets.tid()) :: integer()
   def count(table) do
@@ -354,6 +357,8 @@ defmodule IMFastTable do
   @doc """
   Return the count of records that match with the `pattern` and/or `guard`. The `pattern` and the
   `guard` are strings.
+  If pattern is `:full` it will be expanded to a tuple of all fields taking the field names declared
+  with `new/2`.
   """
   @spec custom_count(table :: atom() | :ets.tid(), pattern :: :full | String.t(),
                      guard :: String.t()) :: integer()
@@ -367,7 +372,7 @@ defmodule IMFastTable do
 
   ### get/2
   @doc """
-  Return the full record referenced by the `primary_key`.
+  Return the full record referenced by the primary_key.
   """
   @spec get(table :: atom() | :ets.tid(), primary_key :: any()) :: :not_found | tuple()
   def get(table, primary_key) do
@@ -379,11 +384,11 @@ defmodule IMFastTable do
 
   ### get/3
   @doc """
-  Return the record of the auxiliary table index or the full record of the table. Use the index
-  of `field_name` for the search.
+  Return one o more records using a secondary index key. Return the the auxiliary indexed record or
+  the full main record of the table.
   Option `:return` can be:
     - `return: :records`: return a list of full records from the table
-    - `return: :keys`: return a list of tuples from the table index (`{key, primary_key}`)
+    - `return: :keys`: return a list of auxiliary secondary index record (`{{:<index>, key}, primary_key}`)
   """
   @spec get(table :: atom() | :ets.tid(), field_name :: atom(), key :: any(), options :: map() | list())
             :: list(tuple())
@@ -392,8 +397,8 @@ defmodule IMFastTable do
     get(table, field_name, key, Enum.into(opts, %{}))
   def get(table, field_name, key, %{return: :records}) do
     case get(table, field_name, key, %{return: :keys}) do
-      [] ->
-        []
+      [] = list ->
+        list
 
       list ->
         list
@@ -409,8 +414,29 @@ defmodule IMFastTable do
 
   ### get_range/4 get_range/5
   @doc """
-  Return a list of records referenced by the key in `field_name` and with values between `from` and
-  `to`.
+  Delete a bunch of records referenced by a range of one of its primary key or its secondary indexes
+  keys.
+  If you have a table like this:
+  ```
+  new(:users, [
+    id: :primary_key
+    name: :unindexed,
+    year: :indexed_non_uniq,
+    phone: :indexed
+  ], [
+    ...
+  ])
+  ```
+  You can get a range of records using the primary key:
+  ```
+  get_range(table, :id, 100, 200)  # get the records with id >= 100 and <= 200
+  ```
+  or get a range of records using the key of a secondary index:
+  ```
+  get_range(table, :year, 1940, 1950)  # get the records with year >= 1940 and <= 1950
+  ```
+  Just as in `get/3` you can get a list of full records from the table or a list of auxiliary
+  secondary index record (return: :records or return: :keys)
   """
   @spec get_range(table :: atom() | :ets.tid(), field_name :: atom(),
                      from :: any(), to :: any()) :: list()
@@ -448,8 +474,8 @@ defmodule IMFastTable do
 
   ### record_to_map/2
   @doc """
-  Convert a tuple record into a map. If the first argument is not a tuple return just this value.
-  That is because many times the record is possible that come from a `get` and can take value
+  Convert a tuple record into a map. If the first argument is not a tuple, return just the argument
+  passed. That is because many times the record come from a `get/n` call and can take as value
   :not_found.
   """
   @spec record_to_map(record :: tuple(), table :: atom() | :ets.tid()) :: map()
@@ -475,7 +501,7 @@ defmodule IMFastTable do
 
   ### store/2
   @doc """
-  Flush the table to disk in the pathname.
+  Flush the table to disk in the file pointed by pathname.
   """
   @spec store(table :: atom() | :ets.tid(), pathname :: String.t()) :: true | false
   def store(table, pathname) do
@@ -484,7 +510,7 @@ defmodule IMFastTable do
 
   ### load/1
   @doc """
-  Load the table from the pathname.
+  Load the table from file in pathname.
   """
   @spec load(pathname :: String.t()) :: {:ok, table :: atom() | :ets.tid()} | {:error, term()}
   def load(pathname) do
@@ -494,7 +520,9 @@ defmodule IMFastTable do
   ### reindex/1
   # For internar use. Anyway, you can call this function directly just as
   # any other api call.
-  @doc false
+  @doc """
+  Clear every secondary indexed record and rebuild the secondary index info.
+  """
   def reindex(table) do
     fields = Keyword.get(:ets.lookup(table, :_fields), :_fields)
     :ets.select_delete(table, filter_string("{pk, _}", "pk not in [:_autosave, :_fields]", "true"))
@@ -533,7 +561,7 @@ defmodule IMFastTable do
   end
 
   ### custom_search/4
-  # For internar use. Anyway, you can call  directly this function at will.
+  # For internar use. Anyway, you can call directly this function at will.
   @doc false
   def custom_search(table, pattern \\ :full, guard \\ "true", return \\ "full_record")
   def custom_search(table, :full, guard, return) do

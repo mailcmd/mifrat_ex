@@ -311,6 +311,19 @@ defmodule IMFastTable do
     length(list)
   end
 
+  ### delete_all/1
+  @doc """
+  WARNING!!! This function remove physically every record in the table.
+  """
+  @spec delete_all(table :: atom() | :ets.tid()) :: :ok
+  def delete_all(table) do
+    [fields] = :ets.lookup(table, :_fields)
+    [autosave] = :ets.lookup(table, :_autosave)
+    :ets.delete_all_objects(table)
+    :ets.insert(table, fields)
+    :ets.insert(table, autosave)
+  end
+
   ### custom_delete/3
   @doc false
   # For internal use.
@@ -497,15 +510,6 @@ defmodule IMFastTable do
           primary_key
         )
       end)
-  end
-
-  ### remove_all/1
-  @doc """
-  WARNING!!! This function remove physically every record in the main table and the index tables.
-  """
-  @spec remove_all(table :: atom() | :ets.tid()) :: :ok
-  def remove_all(table) do
-    :ets.delete_all_objects(table)
   end
 
   ### garbage_collector/1

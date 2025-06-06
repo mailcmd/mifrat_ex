@@ -438,13 +438,23 @@ defmodule IMFastTable do
   Convert a tuple record into a map
   """
   @spec record_to_map(record :: tuple(), table :: atom() | :ets.tid()) :: map()
-  def record_to_map(record, _) when not is_tuple(record), do: record
-  def record_to_map(record, table) do
+  def record_to_map(record, table) when is_tuple(record) do
     Keyword.get(:ets.lookup(table, :_fields), :_fields)
       |> Enum.map(fn {f, _} -> f end)
       |> :lists.enumerate()
       |> Enum.map(fn {i, k} -> {k, elem(record, i-1)} end)
       |> Enum.into(%{})
+  end
+
+  ### map_to_record/2
+  @doc """
+  Convert a map into a tuple record
+  """
+  @spec map_to_record(map :: map(), table :: atom() | :ets.tid()) :: map()
+  def map_to_record(%{} = map, table) do
+    Keyword.get(:ets.lookup(table, :_fields), :_fields)
+      |> Enum.reduce([], fn {f, _} -> map[f] end)
+      |> List.to_tuple()
   end
 
   ### store/2
@@ -474,6 +484,7 @@ defmodule IMFastTable do
     :ets.select_delete(table, filter_string("{_, _}", "", "true"))
 
     :ets.tab2list(table)
+      |> Stream.filter(fn record -> elem(record, 0) not in [:_autosave, :_fields] end)
       |> Enum.each(fn record ->
         primary_key = elem(record, 0)
         insert_indexes(

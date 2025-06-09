@@ -1,13 +1,20 @@
 defmodule IMFastTable do
   @moduledoc """
-
   Module to manage an in-memory table with primary_key and secondary indexes.
-
   """
+
+  @type field_range() :: {any(), any()}
 
   ################################################################################
   # Macros
   ################################################################################
+  defmacro __using__(_) do
+    quote do
+      require IMFastTable
+      import IMFastTable, only: [imft_query: 1]
+    end
+  end
+
   defmacro filter_string(pattern, guard \\ "true", return \\ "full_record") do
     quote generated: true do
       f =
@@ -28,6 +35,170 @@ defmodule IMFastTable do
           unquote(return)
         end
       :ets.fun2ms(f)
+    end
+  end
+
+  ####### Query langugage #######
+
+  @doc """
+  Do it easy, make queries with a more natural language...
+  """
+  # imft_query from: table, get: {field1, field2, ...}, when: <expr>
+  @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple(), when: any()) :: list(tuple())
+  defmacro imft_query(from: table, get: fields, when: expr) do
+    ret_fields = fields
+      |> Macro.to_string()
+      |> String.replace(~r/[\{\}]+/, "")
+      |> String.split(",")
+      |> Enum.map(fn v -> String.trim(v) |> String.to_atom() end)
+
+    pattern = {:{}, [],
+      :ets.lookup(table, :_fields)
+        |> Keyword.get(:_fields)
+        |> Enum.map(fn {f, _} ->
+          if f in ret_fields or String.contains?(Macro.to_string(expr), to_string(f)) do
+            {f, [], Elixir}
+          else
+            f = ("_" <> to_string(f)) |> String.to_atom()
+            {f, [], Elixir}
+          end
+        end)
+    } |> Macro.to_string()
+
+    return =
+      if fields == :all do
+        {:full_record, [], Elixir}
+      else
+        Macro.to_string(fields)
+      end
+    guard = Macro.to_string(expr)
+
+    quote generated: true do
+      f = Code.eval_string("""
+        fn (#{unquote(pattern)} #{unquote(return) == :full_record && " = full_record" || ""})
+            #{unquote(guard) in ["", "true"] && "" || " when #{unquote(guard)}"} ->
+          #{unquote(return)}
+        end
+      """) |> elem(0)
+      :ets.select(unquote(table), :ets.fun2ms(f))
+    end
+  end
+
+  # imft_query from: table, get: {field1, field2, ...}
+  @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple()) :: list(tuple())
+  defmacro imft_query(from: table, get: fields) do
+    quote do
+      require IMFastTable
+      IMFastTable.imft_query(from: unquote(table), get: unquote(fields), when: true)
+    end
+  end
+
+  # imft_query from: table, get: {field1, field2,...}, when: fieldN, in_range: [f, t]
+  @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple(), when: any(),
+                   in_range: field_range()) :: list(tuple())
+  defmacro imft_query(from: table, get: fields, when: field, in_range: {from, to}) do
+    ret_fields =
+      if fields == :all do
+        :ets.lookup(table, :_fields)
+          |> Keyword.get(:_fields)
+          |> Enum.map(fn {f, _} ->
+            f
+          end)
+      else
+        fields
+          |> Macro.to_string()
+          |> String.replace(~r/[\{\}]+/, "")
+          |> String.split(",")
+          |> Enum.map(fn v -> String.trim(v) |> String.to_atom() end)
+      end
+
+    pattern = {:{}, [],
+      :ets.lookup(table, :_fields)
+        |> Keyword.get(:_fields)
+        |> Enum.map(fn {f, _} ->
+          if f in ret_fields do
+            {f, [], Elixir}
+          else
+            f = ("_" <> to_string(f)) |> String.to_atom()
+            {f, [], Elixir}
+          end
+        end)
+    } |> Macro.to_string()
+
+    return =
+      if fields == :all do
+        pattern
+      else
+        Macro.to_string(fields)
+      end
+
+    field = elem(field, 0)
+
+    quote do
+      records = IMFastTable.get_range(unquote(table), unquote(field), unquote(from), unquote(to), [return: :records])
+      case records do
+        [] -> []
+        list ->
+          f = Code.eval_string("""
+            fn (#{unquote(pattern)}) ->
+              #{unquote(return)}
+            end
+          """) |> elem(0)
+          list
+            |> Enum.map( &(f.(&1)) )
+      end
+    end
+  end
+
+  # imft_query from: table, delete_when: <expr>
+  @spec imft_query(from: table :: atom() | :ets.tid(), delete_when: any()) :: list(tuple())
+  defmacro imft_query(from: table, delete_when: expr) do
+    guard = Macro.to_string(expr)
+    quote generated: true do
+      IMFastTable.custom_delete(unquote(table), IMFastTable.build_pattern(unquote(table), unquote(guard)), unquote(guard))
+    end
+  end
+
+  # imft_query from: table, delete: list_of_primary_keys
+  @spec imft_query(from: table :: atom() | :ets.tid(), delete: list(term())) :: :ok
+  defmacro imft_query(from: table, delete: list) when is_list(list) do
+    quote generated: true do
+      IMFastTable.delete_list(unquote(table), unquote(list))
+    end
+  end
+
+  # imft_query from: table, delete: primary_key
+  @spec imft_query(from: table :: atom() | :ets.tid(), delete: term()) :: :ok
+  defmacro imft_query(from: table, delete: primary_key) do
+    quote generated: true do
+      IMFastTable.delete(unquote(table), unquote(primary_key))
+    end
+  end
+
+  # imft_query from: table, delete_when: field, in_range: [f,t]
+  @spec imft_query(from: table :: atom() | :ets.tid(), delete_when: atom(),
+                   in_range: field_range()) :: integer()
+  defmacro imft_query(from: table, delete_when: field, in_range: {from, to}) do
+    field = elem(field, 0)
+    quote generated: true do
+      IMFastTable.delete_range(unquote(table), unquote(field), unquote(from), unquote(to))
+    end
+  end
+
+  # imft_query from: table, delete_when_in_range: [f,t]
+  @spec imft_query(from: table :: atom() | :ets.tid(), delete_when_in_range: field_range())
+                   :: integer()
+  defmacro imft_query(from: table, delete_when_in_range: {from, to}) do
+    quote generated: true do
+      IMFastTable.delete_range(unquote(table), unquote(from), unquote(to))
+    end
+  end
+
+  # imft_query insert_into: table, values: tuple
+  @spec imft_query(insert_into: table :: atom() | :ets.tid(), values: tuple()) :: list(true | false | :skip)
+  defmacro imft_query(insert_into: table, values: tuple) do
+    quote generated: true do
+      IMFastTable.insert(unquote(table), unquote(tuple))
     end
   end
 
@@ -222,6 +393,7 @@ defmodule IMFastTable do
         fields,
         primary_key
       )
+      :ok
     else
       :not_found
     end
@@ -306,8 +478,17 @@ defmodule IMFastTable do
   def delete_range(table, field_name, from, to) do
     list = get_range(table, field_name, from, to)
     list
-      |> Enum.each(fn {_, pk} -> delete(table, pk) end)
-    length(list)
+      |> Enum.map(fn {_, pks} ->
+        case pks do
+          list when is_list(list) ->
+            delete_list(table, list)
+            length(list)
+          pk ->
+            delete(table, pk)
+            1
+        end
+      end)
+      |> Enum.sum()
   end
 
   ### delete_all/1

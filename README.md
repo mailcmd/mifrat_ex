@@ -12,7 +12,7 @@ See [HOW_ITS_WORKS.md](HOW_ITS_WORKS.md) document.
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `i_m_fast_table` to your list of dependencies in `mix.exs`:
+by adding `mifrat_ex` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do

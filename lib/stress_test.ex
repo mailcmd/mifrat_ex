@@ -1,4 +1,5 @@
 defmodule IMFastTable.StressTest do
+  @moduledoc false
   import IMFastTable
 
   def fill(count \\ 1000) do

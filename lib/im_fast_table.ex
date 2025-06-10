@@ -1,6 +1,50 @@
 defmodule IMFastTable do
   @moduledoc """
-  Module to manage an in-memory table with primary_key and secondary indexes.
+  Module to manage/access an in-memory table with primary_key and secondary indexes.
+
+  To manage data you can use a classic functional style:
+  ```elixir
+  get(:users, 1234)
+  get(:users, :name, "Benito Camela")
+  delete(:users, 5432)
+  insert(:users, ...)
+  # etc...
+  ```
+
+  or you can use a pseudo query language:
+  ```elixir
+  # Get data
+  imft_query from: :users, get: {id, name}
+  imft_query from: :users, get: {id, name}, when: id >= 10 and id <= 15
+  imft_query from: :users, get: {id, name, dni}, when: year, in_range: {1940,1950}
+
+  # Delete data
+  imft_query from: :users, delete_when: id < 5
+  imft_query from: :users, delete: 5 # delete record by primary_key
+  imft_query from: :users, delete: [1, 2, 3, 4] # delete records by primary_keys
+  imft_query from: :users, delete_when_in_range: {1,4} # delete records by a range of primary_keys
+  imft_query from: :users, delete_when: year, in_range: {1940, 1950}
+
+  # Add/update data
+  # insert_into will push new data if the primary_key does not exists, otherwise update fields
+  imft_query insert_into: :users, values: {21, "Cachirulo Gonzalez", 1995, 2599945445, 1, 22845856}
+  ```
+
+  **NOTE**: In the `when` expressions you can use ONLY guard enable functions.
+
+  **TODO**: a more complex expression parser that allow `like`, `ilike`, `lower`, `upper`, and many more
+  inline functions to filter records.
+
+  ## Installation
+
+  ```elixir
+  def deps do
+    [
+      {:i_m_fast_table, "~> 0.3.0"}
+    ]
+  end
+  ```
+
   """
 
   @type field_range() :: {any(), any()}
@@ -15,6 +59,7 @@ defmodule IMFastTable do
     end
   end
 
+  @doc false
   defmacro filter_string(pattern, guard \\ "true", return \\ "full_record") do
     quote generated: true do
       f =
@@ -28,6 +73,7 @@ defmodule IMFastTable do
     end
   end
 
+  @doc false
   defmacro filter(pattern, guard \\ true, return \\ quote do: full_record) do
     quote generated: true do
       f =
@@ -41,7 +87,40 @@ defmodule IMFastTable do
   ####### Query langugage #######
 
   @doc """
-  Do it easy, make queries with a more natural language...
+  Do it easy, make queries with a more natural language.
+
+  This macro define a pseudo query languate to get/delete/insert data in the table.
+  If you have a table `:users` with this struct:
+  ```elixir
+  [
+    id: :primary_key,
+    name: :unindexed,
+    year: :indexed_non_uniq,
+    phone: :indexed,
+    category: :indexed_non_uniq,
+    dni: :indexed
+  ]
+  ```
+
+  You could do:
+  ```elixir
+  # Get data
+  imft_query from: :users, get: {id, name}
+  imft_query from: :users, get: {id, name}, when: id >= 10 and id <= 15
+  imft_query from: :users, get: {id, name, dni}, when: year, in_range: {1940,1950}
+
+  # Delete data
+  imft_query from: :users, delete_when: id < 5
+  imft_query from: :users, delete: 5 # delete record by primary_key
+  imft_query from: :users, delete: [1, 2, 3, 4] # delete records by primary_keys
+  imft_query from: :users, delete_when_in_range: {1,4} # delete records by a range of primary_keys
+  imft_query from: :users, delete_when: year, in_range: {1940, 1950}
+
+  # Add/update data
+  # insert_into will push new data if the primary_key does not exists, otherwise update fields
+  imft_query insert_into: :users, values: {21, "Cachirulo Gonzalez", 1995, 2599945445, 1, 22845856}
+  ```
+
   """
   # imft_query from: table, get: {field1, field2, ...}, when: <expr>
   @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple(), when: any()) :: list(tuple())
@@ -75,7 +154,7 @@ defmodule IMFastTable do
 
     quote generated: true do
       f = Code.eval_string("""
-        fn (#{unquote(pattern)} #{unquote(return) == :full_record && " = full_record" || ""})
+        fn (#{unquote(pattern)} #{unquote(return) == :full_record && " = full_record" |4| ""})
             #{unquote(guard) in ["", "true"] && "" || " when #{unquote(guard)}"} ->
           #{unquote(return)}
         end
@@ -175,7 +254,7 @@ defmodule IMFastTable do
     end
   end
 
-  # imft_query from: table, delete_when: field, in_range: [f,t]
+  # imft_query from: table, delete_when: field, in_range: {f,t}
   @spec imft_query(from: table :: atom() | :ets.tid(), delete_when: atom(),
                    in_range: field_range()) :: integer()
   defmacro imft_query(from: table, delete_when: field, in_range: {from, to}) do
@@ -185,7 +264,7 @@ defmodule IMFastTable do
     end
   end
 
-  # imft_query from: table, delete_when_in_range: [f,t]
+  # imft_query from: table, delete_when_in_range: {f,t}
   @spec imft_query(from: table :: atom() | :ets.tid(), delete_when_in_range: field_range())
                    :: integer()
   defmacro imft_query(from: table, delete_when_in_range: {from, to}) do
@@ -231,9 +310,9 @@ defmodule IMFastTable do
 
   ### new/2 | new/3
   @doc """
-  Create a table. The fields is a keyword list; each pair has a field name (the key) and an index
+  Create a table. The fields are defined with a keyword list; each pair has a field name (the key) and an index
   type (the value). The order of the fields is important and the primary key must be the first.
-  ```
+  ```elixir
   new(:users, [
     id: :primary_key
     name: :unindexed,
@@ -306,11 +385,11 @@ defmodule IMFastTable do
   Insert or update a record. If the primary key does not exists it insert, otherwise update.
   The fields values must follow the order declared with `new/2` or `new/3`. It can be a list or a
   tuple.
-  ```
+  ```elixir
   insert(:users, {1, "Jorge Luis Borges", 1899, 542915040798})
   ```
   or
-  ```
+  ```elixir
   insert(:users, [1, "Jorge Luis Borges", 1899, 542915040798])
   ```
   """
@@ -379,7 +458,7 @@ defmodule IMFastTable do
 
   ### delete/2
   @doc """
-  Delete a record by primary_key
+  Delete a record by primary_key.
   """
   @spec delete(table :: atom() | :ets.tid(), primary_key :: any()) :: :not_found | :ok
   def delete(table, primary_key) do
@@ -429,7 +508,7 @@ defmodule IMFastTable do
 
   ### delete/3
   @doc """
-  Delete one or more records by a secondary_key
+  Delete one or more records by a secondary_key.
   """
   @spec delete(table :: atom() | :ets.tid(), field_name :: atom(), key :: any()) :: integer()
   def delete(table, field_name, key) do
@@ -540,6 +619,10 @@ defmodule IMFastTable do
   `guard` are strings.
   If pattern is `:full` it will be expanded to a tuple of all fields taking the field names declared
   with `new/2`.
+  ```elixir
+  # Example
+  custom_count(:users, "{_id, _name, year, _phone}", "year == 1985")
+  ```
   """
   @spec custom_count(table :: atom() | :ets.tid(), pattern :: :full | String.t(),
                      guard :: String.t()) :: integer()
@@ -598,7 +681,7 @@ defmodule IMFastTable do
   Delete a bunch of records referenced by a range of one of its primary key or its secondary indexes
   keys.
   If you have a table like this:
-  ```
+  ```elixir
   new(:users, [
     id: :primary_key
     name: :unindexed,
@@ -609,11 +692,11 @@ defmodule IMFastTable do
   ])
   ```
   You can get a range of records using the primary key:
-  ```
+  ```elixir
   get_range(table, :id, 100, 200)  # get the records with id >= 100 and <= 200
   ```
   or get a range of records using the key of a secondary index:
-  ```
+  ```elixir
   get_range(table, :year, 1940, 1950)  # get the records with year >= 1940 and <= 1950
   ```
   Just as in `get/3` you can get a list of full records from the table or a list of auxiliary
@@ -671,7 +754,7 @@ defmodule IMFastTable do
 
   ### map_to_record/2
   @doc """
-  Convert a map into a tuple record
+  Convert a map into a tuple record.
   """
   @spec map_to_record(map :: map(), table :: atom() | :ets.tid()) :: map()
   def map_to_record(%{} = map, table) do
@@ -702,7 +785,7 @@ defmodule IMFastTable do
   # For internar use. Anyway, you can call this function directly just as
   # any other api call.
   @doc """
-  Clear every secondary indexed record and rebuild the secondary index info.
+  Clear every secondary indexes and rebuild every one again from zero.
   """
   def reindex(table) do
     fields = Keyword.get(:ets.lookup(table, :_fields), :_fields)

@@ -1,6 +1,6 @@
-defmodule IMFastTable.StressTest do
+defmodule Mifrat.StressTest do
   @moduledoc false
-  import IMFastTable
+  import Mifrat
 
   def fill(count \\ 1000) do
     try do

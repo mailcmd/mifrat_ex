@@ -1,6 +1,9 @@
-defmodule IMFastTable do
+defmodule Mifrat do
   @moduledoc """
-  Module to manage/access an in-memory table with primary_key and secondary indexes.
+  *(Mifrat is an acronym of Many Indexed Fields Random Access Table)*
+
+  Module to manage an in-memory table with primary_key and secondary indexes. The objective is to
+  have a way to store complex temporary records with fast access through any indexed field.
 
   To manage data you can use a classic functional style:
   ```elixir
@@ -40,7 +43,7 @@ defmodule IMFastTable do
   ```elixir
   def deps do
     [
-      {:i_m_fast_table, "~> 0.3.0"}
+      {:mifrat_ex, "~> 0.3.1"}
     ]
   end
   ```
@@ -54,8 +57,8 @@ defmodule IMFastTable do
   ################################################################################
   defmacro __using__(_) do
     quote do
-      require IMFastTable
-      import IMFastTable, only: [imft_query: 1]
+      require Mifrat
+      import Mifrat, only: [imft_query: 1]
     end
   end
 
@@ -167,8 +170,8 @@ defmodule IMFastTable do
   @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple()) :: list(tuple())
   defmacro imft_query(from: table, get: fields) do
     quote do
-      require IMFastTable
-      IMFastTable.imft_query(from: unquote(table), get: unquote(fields), when: true)
+      require Mifrat
+      Mifrat.imft_query(from: unquote(table), get: unquote(fields), when: true)
     end
   end
 
@@ -214,7 +217,7 @@ defmodule IMFastTable do
     field = elem(field, 0)
 
     quote do
-      records = IMFastTable.get_range(unquote(table), unquote(field), unquote(from), unquote(to), [return: :records])
+      records = Mifrat.get_range(unquote(table), unquote(field), unquote(from), unquote(to), [return: :records])
       case records do
         [] -> []
         list ->
@@ -234,7 +237,7 @@ defmodule IMFastTable do
   defmacro imft_query(from: table, delete_when: expr) do
     guard = Macro.to_string(expr)
     quote generated: true do
-      IMFastTable.custom_delete(unquote(table), IMFastTable.build_pattern(unquote(table), unquote(guard)), unquote(guard))
+      Mifrat.custom_delete(unquote(table), Mifrat.build_pattern(unquote(table), unquote(guard)), unquote(guard))
     end
   end
 
@@ -242,7 +245,7 @@ defmodule IMFastTable do
   @spec imft_query(from: table :: atom() | :ets.tid(), delete: list(term())) :: :ok
   defmacro imft_query(from: table, delete: list) when is_list(list) do
     quote generated: true do
-      IMFastTable.delete_list(unquote(table), unquote(list))
+      Mifrat.delete_list(unquote(table), unquote(list))
     end
   end
 
@@ -250,7 +253,7 @@ defmodule IMFastTable do
   @spec imft_query(from: table :: atom() | :ets.tid(), delete: term()) :: :ok
   defmacro imft_query(from: table, delete: primary_key) do
     quote generated: true do
-      IMFastTable.delete(unquote(table), unquote(primary_key))
+      Mifrat.delete(unquote(table), unquote(primary_key))
     end
   end
 
@@ -260,7 +263,7 @@ defmodule IMFastTable do
   defmacro imft_query(from: table, delete_when: field, in_range: {from, to}) do
     field = elem(field, 0)
     quote generated: true do
-      IMFastTable.delete_range(unquote(table), unquote(field), unquote(from), unquote(to))
+      Mifrat.delete_range(unquote(table), unquote(field), unquote(from), unquote(to))
     end
   end
 
@@ -269,7 +272,7 @@ defmodule IMFastTable do
                    :: integer()
   defmacro imft_query(from: table, delete_when_in_range: {from, to}) do
     quote generated: true do
-      IMFastTable.delete_range(unquote(table), unquote(from), unquote(to))
+      Mifrat.delete_range(unquote(table), unquote(from), unquote(to))
     end
   end
 
@@ -277,7 +280,7 @@ defmodule IMFastTable do
   @spec imft_query(insert_into: table :: atom() | :ets.tid(), values: tuple()) :: list(true | false | :skip)
   defmacro imft_query(insert_into: table, values: tuple) do
     quote generated: true do
-      IMFastTable.insert(unquote(table), unquote(tuple))
+      Mifrat.insert(unquote(table), unquote(tuple))
     end
   end
 

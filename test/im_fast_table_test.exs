@@ -1,8 +1,8 @@
-defmodule IMFastTableTest do
+defmodule MifratTest do
   use ExUnit.Case
-  doctest IMFastTable
+  doctest Mifrat
 
   test "greets the world" do
-    assert IMFastTable.hello() == :world
+    assert Mifrat.hello() == :world
   end
 end

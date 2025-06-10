@@ -1,9 +1,10 @@
-defmodule IMFastTable.MixProject do
+defmodule Mifrat.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :i_m_fast_table,
+      app: :mifrat_ex,
+      description: "Many indexed fields easy random access table",
       version: "0.3.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
@@ -30,11 +31,11 @@ defmodule IMFastTable.MixProject do
 
   defp package() do
     [
-      name: "i_m_fast_table",
+      name: "mifrat_ex",
       description: "Module to manage/access an in-memory table with primary_key and secondary indexes.",
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/mailcmd/IMFastTable"},
-      source_url: "https://github.com/mailcmd/IMFastTable",
+      links: %{"GitHub" => "https://github.com/mailcmd/mifrat_ex"},
+      source_url: "https://github.com/mailcmd/mifrat_ex",
     ]
   end
 end

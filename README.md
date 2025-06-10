@@ -1,7 +1,7 @@
-# IMFastTable
+# Mifrat (acronym of Many Indexed Fields Random Access Table)
 
-Module to manage an in-memory table with primary_key and secondary indexes. The porporse is to have
-a way to store temporal complex records with fast access althrough any indexed field.
+Module to manage an in-memory table with primary_key and secondary indexes. The objective is to have
+a way to store complex temporary records with fast access through any indexed field.
 
 ## How its work:
 
@@ -17,12 +17,12 @@ by adding `i_m_fast_table` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:i_m_fast_table, "~> 0.3.0"}
+    {:mifrat_ex, "~> 0.3.0"}
   ]
 end
 ```
 
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/i_m_fast_table>.
+be found at <https://hexdocs.pm/mifrat_ex>.
 

@@ -16,21 +16,23 @@ defmodule Mifrat do
 
   or you can use a pseudo query language:
   ```elixir
+  use Mifrat
+
   # Get data
-  imft_query from: :users, get: {id, name}
-  imft_query from: :users, get: {id, name}, when: id >= 10 and id <= 15
-  imft_query from: :users, get: {id, name, dni}, when: year, in_range: {1940,1950}
+  mifrat_query from: :users, get: {id, name}
+  mifrat_query from: :users, get: {id, name}, when: id >= 10 and id <= 15
+  mifrat_query from: :users, get: {id, name, dni}, when: year, in_range: {1940,1950}
 
   # Delete data
-  imft_query from: :users, delete_when: id < 5
-  imft_query from: :users, delete: 5 # delete record by primary_key
-  imft_query from: :users, delete: [1, 2, 3, 4] # delete records by primary_keys
-  imft_query from: :users, delete_when_in_range: {1,4} # delete records by a range of primary_keys
-  imft_query from: :users, delete_when: year, in_range: {1940, 1950}
+  mifrat_query from: :users, delete_when: id < 5
+  mifrat_query from: :users, delete: 5 # delete record by primary_key
+  mifrat_query from: :users, delete: [1, 2, 3, 4] # delete records by primary_keys
+  mifrat_query from: :users, delete_when_in_range: {1,4} # delete records by a range of primary_keys
+  mifrat_query from: :users, delete_when: year, in_range: {1940, 1950}
 
   # Add/update data
   # insert_into will push new data if the primary_key does not exists, otherwise update fields
-  imft_query insert_into: :users, values: {21, "Cachirulo Gonzalez", 1995, 2599945445, 1, 22845856}
+  mifrat_query insert_into: :users, values: {21, "Cachirulo Gonzalez", 1995, 2599945445, 1, 22845856}
   ```
 
   **NOTE**: In the `when` expressions you can use ONLY guard enable functions.
@@ -58,7 +60,7 @@ defmodule Mifrat do
   defmacro __using__(_) do
     quote do
       require Mifrat
-      import Mifrat, only: [imft_query: 1]
+      import Mifrat, only: [mifrat_query: 1, imft_query: 1]
     end
   end
 
@@ -108,26 +110,26 @@ defmodule Mifrat do
   You could do:
   ```elixir
   # Get data
-  imft_query from: :users, get: {id, name}
-  imft_query from: :users, get: {id, name}, when: id >= 10 and id <= 15
-  imft_query from: :users, get: {id, name, dni}, when: year, in_range: {1940,1950}
+  mifrat_query from: :users, get: {id, name}
+  mifrat_query from: :users, get: {id, name}, when: id >= 10 and id <= 15
+  mifrat_query from: :users, get: {id, name, dni}, when: year, in_range: {1940,1950}
 
   # Delete data
-  imft_query from: :users, delete_when: id < 5
-  imft_query from: :users, delete: 5 # delete record by primary_key
-  imft_query from: :users, delete: [1, 2, 3, 4] # delete records by primary_keys
-  imft_query from: :users, delete_when_in_range: {1,4} # delete records by a range of primary_keys
-  imft_query from: :users, delete_when: year, in_range: {1940, 1950}
+  mifrat_query from: :users, delete_when: id < 5
+  mifrat_query from: :users, delete: 5 # delete record by primary_key
+  mifrat_query from: :users, delete: [1, 2, 3, 4] # delete records by primary_keys
+  mifrat_query from: :users, delete_when_in_range: {1,4} # delete records by a range of primary_keys
+  mifrat_query from: :users, delete_when: year, in_range: {1940, 1950}
 
   # Add/update data
   # insert_into will push new data if the primary_key does not exists, otherwise update fields
-  imft_query insert_into: :users, values: {21, "Cachirulo Gonzalez", 1995, 2599945445, 1, 22845856}
+  mifrat_query insert_into: :users, values: {21, "Cachirulo Gonzalez", 1995, 2599945445, 1, 22845856}
   ```
 
   """
-  # imft_query from: table, get: {field1, field2, ...}, when: <expr>
-  @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple(), when: any()) :: list(tuple())
-  defmacro imft_query(from: table, get: fields, when: expr) do
+  # mifrat_query from: table, get: {field1, field2, ...}, when: <expr>
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), get: tuple(), when: any()) :: list(tuple())
+  defmacro mifrat_query(from: table, get: fields, when: expr) do
     ret_fields = fields
       |> Macro.to_string()
       |> String.replace(~r/[\{\}]+/, "")
@@ -157,28 +159,29 @@ defmodule Mifrat do
 
     quote generated: true do
       f = Code.eval_string("""
-        fn (#{unquote(pattern)} #{unquote(return) == :full_record && " = full_record" |4| ""})
+        fn (#{unquote(pattern)} #{unquote(return) == :full_record && " = full_record" || ""})
             #{unquote(guard) in ["", "true"] && "" || " when #{unquote(guard)}"} ->
           #{unquote(return)}
         end
       """) |> elem(0)
+
       :ets.select(unquote(table), :ets.fun2ms(f))
     end
   end
 
-  # imft_query from: table, get: {field1, field2, ...}
-  @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple()) :: list(tuple())
-  defmacro imft_query(from: table, get: fields) do
+  # mifrat_query from: table, get: {field1, field2, ...}
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), get: tuple()) :: list(tuple())
+  defmacro mifrat_query(from: table, get: fields) do
     quote do
       require Mifrat
-      Mifrat.imft_query(from: unquote(table), get: unquote(fields), when: true)
+      Mifrat.mifrat_query(from: unquote(table), get: unquote(fields), when: true)
     end
   end
 
-  # imft_query from: table, get: {field1, field2,...}, when: fieldN, in_range: [f, t]
-  @spec imft_query(from: table :: atom() | :ets.tid(), get: tuple(), when: any(),
+  # mifrat_query from: table, get: {field1, field2,...}, when: fieldN, in_range: [f, t]
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), get: tuple(), when: any(),
                    in_range: field_range()) :: list(tuple())
-  defmacro imft_query(from: table, get: fields, when: field, in_range: {from, to}) do
+  defmacro mifrat_query(from: table, get: fields, when: field, in_range: {from, to}) do
     ret_fields =
       if fields == :all do
         :ets.lookup(table, :_fields)
@@ -232,55 +235,62 @@ defmodule Mifrat do
     end
   end
 
-  # imft_query from: table, delete_when: <expr>
-  @spec imft_query(from: table :: atom() | :ets.tid(), delete_when: any()) :: list(tuple())
-  defmacro imft_query(from: table, delete_when: expr) do
+  # mifrat_query from: table, delete_when: <expr>
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), delete_when: any()) :: list(tuple())
+  defmacro mifrat_query(from: table, delete_when: expr) do
     guard = Macro.to_string(expr)
     quote generated: true do
       Mifrat.custom_delete(unquote(table), Mifrat.build_pattern(unquote(table), unquote(guard)), unquote(guard))
     end
   end
 
-  # imft_query from: table, delete: list_of_primary_keys
-  @spec imft_query(from: table :: atom() | :ets.tid(), delete: list(term())) :: :ok
-  defmacro imft_query(from: table, delete: list) when is_list(list) do
+  # mifrat_query from: table, delete: list_of_primary_keys
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), delete: list(term())) :: :ok
+  defmacro mifrat_query(from: table, delete: list) when is_list(list) do
     quote generated: true do
       Mifrat.delete_list(unquote(table), unquote(list))
     end
   end
 
-  # imft_query from: table, delete: primary_key
-  @spec imft_query(from: table :: atom() | :ets.tid(), delete: term()) :: :ok
-  defmacro imft_query(from: table, delete: primary_key) do
+  # mifrat_query from: table, delete: primary_key
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), delete: term()) :: :ok
+  defmacro mifrat_query(from: table, delete: primary_key) do
     quote generated: true do
       Mifrat.delete(unquote(table), unquote(primary_key))
     end
   end
 
-  # imft_query from: table, delete_when: field, in_range: {f,t}
-  @spec imft_query(from: table :: atom() | :ets.tid(), delete_when: atom(),
+  # mifrat_query from: table, delete_when: field, in_range: {f,t}
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), delete_when: atom(),
                    in_range: field_range()) :: integer()
-  defmacro imft_query(from: table, delete_when: field, in_range: {from, to}) do
+  defmacro mifrat_query(from: table, delete_when: field, in_range: {from, to}) do
     field = elem(field, 0)
     quote generated: true do
       Mifrat.delete_range(unquote(table), unquote(field), unquote(from), unquote(to))
     end
   end
 
-  # imft_query from: table, delete_when_in_range: {f,t}
-  @spec imft_query(from: table :: atom() | :ets.tid(), delete_when_in_range: field_range())
+  # mifrat_query from: table, delete_when_in_range: {f,t}
+  @spec mifrat_query(from: table :: atom() | :ets.tid(), delete_when_in_range: field_range())
                    :: integer()
-  defmacro imft_query(from: table, delete_when_in_range: {from, to}) do
+  defmacro mifrat_query(from: table, delete_when_in_range: {from, to}) do
     quote generated: true do
       Mifrat.delete_range(unquote(table), unquote(from), unquote(to))
     end
   end
 
-  # imft_query insert_into: table, values: tuple
-  @spec imft_query(insert_into: table :: atom() | :ets.tid(), values: tuple()) :: list(true | false | :skip)
-  defmacro imft_query(insert_into: table, values: tuple) do
+  # mifrat_query insert_into: table, values: tuple
+  @spec mifrat_query(insert_into: table :: atom() | :ets.tid(), values: tuple()) :: list(true | false | :skip)
+  defmacro mifrat_query(insert_into: table, values: tuple) do
     quote generated: true do
       Mifrat.insert(unquote(table), unquote(tuple))
+    end
+  end
+
+  # just for compatibility with version 0.3.0
+  defmacro imft_query(params) do
+    quote do
+      Mifrat.mifrat_query(unquote(params))
     end
   end
 

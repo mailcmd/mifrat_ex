@@ -1,5 +1,6 @@
 defmodule Mifrat.StressTest do
   @moduledoc false
+  use Mifrat
   import Mifrat
 
   def fill(count \\ 1000) do

@@ -45,7 +45,7 @@ defmodule Mifrat do
   ```elixir
   def deps do
     [
-      {:mifrat_ex, "~> 0.3.1"}
+      {:mifrat_ex, "~> 0.3.2"}
     ]
   end
   ```

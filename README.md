@@ -17,7 +17,7 @@ by adding `mifrat_ex` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:mifrat_ex, "~> 0.3.0"}
+    {:mifrat_ex, "~> 0.3.1"}
   ]
 end
 ```

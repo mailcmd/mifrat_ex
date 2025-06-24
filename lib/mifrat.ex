@@ -751,9 +751,10 @@ defmodule Mifrat do
 
   ### record_to_map/2
   @doc """
-  Convert a tuple record into a map. If the first argument is not a tuple, return just the argument
-  passed. That is because many times the record come from a `get/n` call and can take as value
-  :not_found.
+  If the first argument is a tuple, this function try to convert the tuple to a map. For that, the function
+  use the information about fields stored in the `table`. If the first argument is not a tuple, the function
+  will return just the argument passed. This is useful specially when the tuple record to convert come
+  from a `get/n` call because that function can return a tuple or :not_found.
   """
   @spec record_to_map(record :: tuple(), table :: atom() | :ets.tid()) :: map()
   def record_to_map(record, _table) when not is_tuple(record), do: record
@@ -784,6 +785,17 @@ defmodule Mifrat do
   def store(table, pathname) do
     :ets.tab2file(table, pathname |> to_charlist())
   end
+
+  ### save/1
+  @doc """
+  Flush the table to disk in the file configured for autosave.
+  """
+  @spec save(table :: atom() | :ets.tid()) :: true | false
+  def save(table) do
+    [{_, _, path}] = :ets.lookup(table, :_autosave)
+    store(table_name, path)
+  end
+
 
   ### load/1
   @doc """

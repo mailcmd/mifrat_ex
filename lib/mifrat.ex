@@ -793,7 +793,7 @@ defmodule Mifrat do
   @spec save(table :: atom() | :ets.tid()) :: true | false
   def save(table) do
     [{_, _, path}] = :ets.lookup(table, :_autosave)
-    store(table_name, path)
+    store(table, path)
   end
 
 
